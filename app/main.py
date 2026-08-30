@@ -1,3 +1,9 @@
+from dotenv import load_dotenv
+
+# Load .env into the process environment before any SDK clients are instantiated.
+# override=False: real environment variables always win over .env values.
+load_dotenv(override=False)
+
 from fastapi import FastAPI
 from app.agent.router import router as agent_router
 from app.catalog.router import router as catalog_router

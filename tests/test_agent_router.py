@@ -159,3 +159,56 @@ def test_agent_purchase_other_approved_product():
     assert data["product_id"] == "HK001"
     assert data["amount"] == 1497.0
     assert data["mandate_limit"] == 2000.0
+
+
+# ==========================================
+# Multi-Merchant Catalog Foundation (Piece A)
+# ==========================================
+
+def test_agent_purchase_cross_merchant_food_approved():
+    """
+    6a. CUST001 buys FD001 (Coconut Oil, ₹349, category='food', merchant_id='MERCH_FOOD')
+    via POST /agent/purchase.
+    Proves end-to-end: cross-merchant + cross-category purchase correctly APPROVED within limit.
+    """
+    payload = {
+        "customer_id": "CUST001",
+        "product_id": "FD001",
+        "quantity": 1,
+    }
+    response = client.post("/agent/purchase", json=payload)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["decision"] == "APPROVED"
+    assert data["product_id"] == "FD001"
+    assert data["amount"] == 349.0
+    assert data["mandate_limit"] == 2000.0
+
+
+def test_agent_purchase_merchant_not_in_mandate_rejected():
+    """
+    6b. CUST002 attempts to buy FD001 (merchant_id='MERCH_FOOD') via POST /agent/purchase.
+    CUST002's mandate only allows MERCH_ELEC — MERCH_FOOD is deliberately excluded.
+    Proves the router's per-product merchant derivation (product.merchant_id) is what reaches the
+    Policy Engine and causes a real MERCHANT_NOT_ALLOWED rejection — not a tautological evaluate() call.
+    If router.py ever reverts to a hardcoded merchant constant, this test will regress.
+    """
+    payload = {
+        "customer_id": "CUST002",
+        "product_id": "FD001",
+        "quantity": 1,
+    }
+    response = client.post("/agent/purchase", json=payload)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["decision"] == "REJECTED"
+    assert data["product_id"] == "FD001"
+    assert data["amount"] == 349.0
+    assert data["mandate_limit"] == 1500.0
+    # Reason must cite the unauthorized merchant — engine text: "is not authorized in customer mandate"
+    assert "MERCH_FOOD" in data["reason"]
+    assert "not authorized" in data["reason"]
+
+

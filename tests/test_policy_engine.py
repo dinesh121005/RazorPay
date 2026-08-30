@@ -22,7 +22,7 @@ def test_canonical_demo_kb001_approved(demo_mandate):
         product_id="KB001",
         category="electronics",
         amount=1499.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, demo_mandate)
@@ -41,7 +41,7 @@ def test_canonical_demo_mn001_rejected_over_limit(demo_mandate):
         product_id="MN001",
         category="electronics",
         amount=4999.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, demo_mandate)
@@ -64,7 +64,7 @@ def test_isolated_violation_customer_mismatch(demo_mandate):
         product_id="KB001",
         category="electronics",
         amount=1499.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, demo_mandate)
@@ -82,7 +82,7 @@ def test_isolated_violation_mandate_expired():
         max_transaction_amount=2000.0,
         currency="INR",
         allowed_categories=["electronics"],
-        allowed_merchants=["MERCHANT_DEMO"],
+        allowed_merchants=["MERCH_ELEC"],
         expires_at=datetime.now(timezone.utc) - timedelta(hours=1)
     )
     req = PurchaseRequest(
@@ -90,7 +90,7 @@ def test_isolated_violation_mandate_expired():
         product_id="KB001",
         category="electronics",
         amount=1499.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, expired_mandate)
@@ -124,7 +124,7 @@ def test_isolated_violation_category_not_allowed(demo_mandate):
         product_id="AUTO001",
         category="automotive",
         amount=500.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, demo_mandate)
@@ -141,7 +141,7 @@ def test_isolated_violation_amount_exceeds_limit(demo_mandate):
         product_id="KB001",
         category="electronics",
         amount=2500.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, demo_mandate)
@@ -162,7 +162,7 @@ def test_boundary_exact_max_amount_approved(demo_mandate):
         product_id="SPEC001",
         category="electronics",
         amount=2000.00,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, demo_mandate)
@@ -179,7 +179,7 @@ def test_boundary_amount_over_by_one_paisa_rejected(demo_mandate):
         product_id="SPEC002",
         category="electronics",
         amount=2000.01,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, demo_mandate)
@@ -200,7 +200,7 @@ def test_expiry_future_expires_at_approved():
         max_transaction_amount=2000.0,
         currency="INR",
         allowed_categories=["electronics"],
-        allowed_merchants=["MERCHANT_DEMO"],
+        allowed_merchants=["MERCH_ELEC"],
         expires_at=datetime.now(timezone.utc) + timedelta(days=7)
     )
     req = PurchaseRequest(
@@ -208,7 +208,7 @@ def test_expiry_future_expires_at_approved():
         product_id="KB001",
         category="electronics",
         amount=1499.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, future_mandate)
@@ -224,7 +224,7 @@ def test_expiry_past_expires_at_rejected():
         max_transaction_amount=2000.0,
         currency="INR",
         allowed_categories=["electronics"],
-        allowed_merchants=["MERCHANT_DEMO"],
+        allowed_merchants=["MERCH_ELEC"],
         expires_at=datetime.now(timezone.utc) - timedelta(minutes=5)
     )
     req = PurchaseRequest(
@@ -232,7 +232,7 @@ def test_expiry_past_expires_at_rejected():
         product_id="KB001",
         category="electronics",
         amount=1499.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req, past_mandate)
@@ -256,7 +256,7 @@ def test_rule_ordering_first_violation_wins():
         max_transaction_amount=2000.0,
         currency="INR",
         allowed_categories=["electronics"],
-        allowed_merchants=["MERCHANT_DEMO"],
+        allowed_merchants=["MERCH_ELEC"],
         expires_at=datetime.now(timezone.utc) - timedelta(days=1)
     )
     # Violates customer_id, merchant, category, and amount all at once
@@ -285,7 +285,7 @@ def test_merchant_case_and_whitespace_tolerance(demo_mandate):
         product_id="KB001",
         category="electronics",
         amount=1499.0,
-        merchant="  merchant_demo  ",
+        merchant="  merch_elec  ",
         quantity=1
     )
     decision = evaluate(req_uppercase, demo_mandate)
@@ -300,7 +300,7 @@ def test_category_case_and_whitespace_tolerance(demo_mandate):
         product_id="KB001",
         category="  Electronics  ",
         amount=1499.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision = evaluate(req_mixed_case, demo_mandate)
@@ -319,7 +319,7 @@ def test_evaluate_purity_repeatable_output(demo_mandate):
         product_id="KB001",
         category="electronics",
         amount=1499.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     decision1 = evaluate(req, demo_mandate)
@@ -336,7 +336,7 @@ def test_evaluate_purity_no_mandate_mutation(demo_mandate):
         product_id="KB001",
         category="electronics",
         amount=1499.0,
-        merchant="MERCHANT_DEMO",
+        merchant="MERCH_ELEC",
         quantity=1
     )
     evaluate(req, demo_mandate)

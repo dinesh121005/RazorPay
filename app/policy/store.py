@@ -7,11 +7,22 @@ DEMO_MANDATES: Dict[str, Mandate] = {
         customer_id="CUST001",
         max_transaction_amount=2000.0,
         currency="INR",
-        allowed_categories=["electronics", "home_kitchen", "apparel"],
-        allowed_merchants=["MERCHANT_DEMO", "demo_store"],
+        allowed_categories=["electronics", "home_kitchen", "apparel", "food"],
+        allowed_merchants=["MERCH_ELEC", "MERCH_FOOD"],
         expires_at=None,
-        prompt_playback="Pre-authorized spending up to ₹2,000 for electronics, home & kitchen, and apparel from verified demo merchants."
-    )
+        prompt_playback="Pre-authorized spending up to \u20b92,000 for electronics, home & kitchen, apparel, and food from verified demo merchants (MERCH_ELEC, MERCH_FOOD)."
+    ),
+    # Test-only fixture: authorized for MERCH_ELEC only — used to exercise the
+    # merchant-authorization rejection path via POST /agent/purchase.
+    "CUST002": Mandate(
+        customer_id="CUST002",
+        max_transaction_amount=1500.0,
+        currency="INR",
+        allowed_categories=["electronics", "home_kitchen"],
+        allowed_merchants=["MERCH_ELEC"],
+        expires_at=None,
+        prompt_playback="Pre-authorized spending up to \u20b91,500 for electronics and home & kitchen from MERCH_ELEC only."
+    ),
 }
 
 
