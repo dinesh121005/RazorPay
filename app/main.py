@@ -6,6 +6,7 @@ load_dotenv(override=False)
 
 from fastapi import FastAPI
 from app.agent.router import router as agent_router
+from app.audit import audit_router
 from app.catalog.router import router as catalog_router
 
 app = FastAPI(
@@ -17,6 +18,7 @@ app = FastAPI(
 # Mount routers
 app.include_router(catalog_router)
 app.include_router(agent_router)
+app.include_router(audit_router)
 
 
 @app.get("/health", tags=["system"], summary="Health check endpoint")

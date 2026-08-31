@@ -11,14 +11,17 @@ A merchant-side FastAPI architecture that allows AI shopping agents to transact 
 ```
 ai-buyer-gateway/
 ├── app/
-│   ├── main.py                  # FastAPI app entrypoint
+│   ├── main.py                  # FastAPI app entrypoint (mounts catalog, agent, and audit routers)
 │   ├── catalog/
 │   │   ├── models.py            # Product Pydantic schema (Phase 1)
 │   │   ├── data.py              # In-memory seed catalog; MERCH_ELEC + MERCH_FOOD products (Phase 1 + Piece A)
 │   │   └── router.py            # GET /products, /products/{id} (Phase 1)
 │   ├── agent/
-│   │   ├── agent.py             # (Phase 4 placeholder)
-│   │   └── router.py            # POST /agent/purchase — orchestration layer (Phase 3)
+│   │   ├── service.py           # Core purchase execution service layer (Phase 4)
+│   │   └── router.py            # POST /agent/purchase — thin HTTP wrapper around service (Phase 3 + Phase 4)
+│   ├── mcp/
+│   │   ├── tools.py             # propose_purchase MCP tool calling service.execute_purchase (Phase 4)
+│   │   └── server.py            # Stdio MCP server for Claude Desktop (Phase 4)
 │   ├── policy/
 │   │   ├── mandate.py           # Mandate schema (Phase 2)
 │   │   ├── engine.py            # Pure evaluate() rule engine (Phase 2)
@@ -29,14 +32,17 @@ ai-buyer-gateway/
 │   │   ├── razorpay_client.py   # Lazy singleton Razorpay SDK wrapper — sole SDK import (Phase 5)
 │   │   └── service.py           # create_order_for_approved(); rupee→paise conversion (Phase 5)
 │   ├── audit/
-│   │   ├── models.py            # (Phase 6 placeholder)
-│   │   └── logger.py            # (Phase 6 placeholder)
+│   │   ├── models.py            # AuditRecord Pydantic schema (Phase 6)
+│   │   ├── store.py             # AuditStore SQLite persistence with two-phase writes (Phase 6)
+│   │   └── router.py            # GET /audit, GET /audit/{transaction_id} (Phase 6)
 │   └── db.py                    # (Persistence placeholder)
 ├── tests/
 │   ├── test_catalog.py          # Catalog endpoint tests (Phase 1)
 │   ├── test_policy_engine.py    # Policy engine rule evaluation tests (Phase 2)
 │   ├── test_agent_router.py     # Agent purchase API integration tests (Phase 3 + Piece A)
-│   └── test_payments.py         # Razorpay payment integration tests (Phase 5)
+│   ├── test_payments.py         # Razorpay payment integration tests (Phase 5)
+│   ├── test_audit.py            # Audit trail store and query endpoint tests (Phase 6)
+│   └── test_mcp.py              # Model Context Protocol (MCP) server & tool tests (Phase 4)
 ├── .env.example                 # Environment variables template
 ├── requirements.txt             # Project dependencies
 └── README.md
@@ -62,6 +68,7 @@ Then edit `.env`:
 ```
 RAZORPAY_KEY_ID=rzp_test_your_key_id_here
 RAZORPAY_KEY_SECRET=your_test_key_secret_here
+DATABASE_URL=gateway.db
 ```
 > ⚠️ **Test Mode only.** Keys starting with `rzp_test_` never move real money.
 > Obtain test keys from the [Razorpay Dashboard → Settings → API Keys](https://dashboard.razorpay.com/).
@@ -89,67 +96,83 @@ uvicorn app.main:app --reload
 | `GET` | `/health` | Service health check |
 | `GET` | `/products` | List catalog products (filter by `category`, `max_price`) |
 | `GET` | `/products/{id}` | Get single product by ID (`KB001`, `MN001`, `FD001`, etc.) |
-| `POST` | `/agent/purchase` | Propose an agent purchase — policy evaluation + Razorpay order creation |
+| `POST` | `/agent/purchase` | Propose an agent purchase — policy evaluation + audit logging + Razorpay order creation |
+| `GET` | `/audit` | List all audit records (filter by `customer_id`, `decision`) |
+| `GET` | `/audit/{transaction_id}` | Get a single audit record by its transaction ID |
 
-### `POST /agent/purchase` — Request / Response
+---
 
-**Request body:**
+## Phase 4 — Model Context Protocol (MCP) Integration
+
+The gateway exposes a native MCP server over **stdio transport**, enabling AI clients like **Claude Desktop** to invoke the purchase workflow as an agentic tool.
+
+### Exposed MCP Tool
+- **`propose_purchase`**: Propose a purchase under customer spending mandates.
+  - **Inputs**: `customer_id` (str), `product_id` (str), `quantity` (int, default: 1).
+  - **Outputs**: Policy verdict (`APPROVED` / `REJECTED`), rule explanation, transaction UUID, computed amount, and Razorpay order ID.
+
+### Connecting Claude Desktop
+Add the gateway to your `claude_desktop_config.json`:
 ```json
 {
-  "customer_id": "CUST001",
-  "product_id": "KB001",
-  "quantity": 1
-}
-```
-
-**Response (APPROVED):**
-```json
-{
-  "decision": "APPROVED",
-  "reason": "Transaction amount ₹1499.00 is within mandate limit of ₹2000.00 ...",
-  "product_id": "KB001",
-  "amount": 1499.0,
-  "mandate_limit": 2000.0,
-  "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
-  "payment": {
-    "status": "created",
-    "razorpay_order_id": "order_ABC123...",
-    "error": null
+  "mcpServers": {
+    "ai-buyer-gateway": {
+      "command": "python",
+      "args": ["-m", "app.mcp.server"],
+      "cwd": "D:\\RazorPay",
+      "env": {
+        "RAZORPAY_KEY_ID": "rzp_test_your_key_id",
+        "RAZORPAY_KEY_SECRET": "your_key_secret",
+        "DATABASE_URL": "gateway.db"
+      }
+    }
   }
-}
-```
-
-**Response (REJECTED):**
-```json
-{
-  "decision": "REJECTED",
-  "reason": "Transaction amount ₹4999.00 exceeds maximum mandate limit ...",
-  "product_id": "MN001",
-  "amount": 4999.0,
-  "mandate_limit": 2000.0,
-  "transaction_id": "550e8400-e29b-41d4-a716-446655440001",
-  "payment": null
 }
 ```
 
 ---
 
-## Phase 5 — Razorpay Test Mode Integration
+## Phase 6 — Audit Trail with SQLite
 
-### What Phase 5 does
-- On a **policy-APPROVED** purchase, creates a real Razorpay Test Mode order via `POST /agent/purchase`.
-- The `transaction_id` (UUID4) minted by the gateway is passed as Razorpay's `receipt` field for cross-system tracing.
-- Amount is converted from INR rupees → paise inside `app/payment/service.py` only — this conversion does not touch `app/catalog/` or `app/policy/`.
-- A Razorpay SDK failure returns `payment.status = "failed"` in the response — it never alters the `PolicyDecision` or causes an HTTP 500.
+"Show the audit trail" is a core judging criterion. Every call to `POST /agent/purchase` writes an immutable record to SQLite:
+1. **Phase A (Always)**: Captured immediately after policy evaluation — logs the proposal details (`customer_id`, `product_id`, `quantity`, `amount`), the verdict (`APPROVED` / `REJECTED`), and the explicit human-readable `decision_reason`.
+2. **Phase B (On Approval)**: Updated with the downstream payment execution outcome (`payment_status`, `razorpay_order_id`).
 
-### What is explicitly OUT OF SCOPE for Phase 5
-The following features are intentionally deferred to later phases:
+### Audit Record Examples
 
-- **Checkout frontend** — no payment UI, redirect flows, or Razorpay Checkout JS.
-- **Payment capture** — order creation uses `payment_capture: 1` (auto-capture). Manual capture is not implemented.
-- **Signature verification** — Razorpay webhook signature validation is not implemented.
-- **Webhooks** — no webhook endpoint or event handling.
-- **Refunds** — no refund initiation or tracking.
+#### 1. Approved Purchase Audit Record (`GET /audit/{transaction_id}`)
+```json
+{
+  "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2026-08-30T10:15:30.123456+00:00",
+  "customer_id": "CUST001",
+  "product_id": "KB001",
+  "merchant_id": "MERCH_ELEC",
+  "quantity": 1,
+  "amount": 1499.0,
+  "decision": "APPROVED",
+  "decision_reason": "Transaction amount ₹1499.00 is within mandate limit of ₹2000.00.",
+  "payment_status": "created",
+  "razorpay_order_id": "order_TW0f49Ev2HnwLD"
+}
+```
+
+#### 2. Rejected Purchase Audit Record (`GET /audit/{transaction_id}`)
+```json
+{
+  "transaction_id": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": "2026-08-30T10:16:45.654321+00:00",
+  "customer_id": "CUST001",
+  "product_id": "MN001",
+  "merchant_id": "MERCH_ELEC",
+  "quantity": 1,
+  "amount": 4999.0,
+  "decision": "REJECTED",
+  "decision_reason": "Transaction amount ₹4999.00 exceeds maximum mandate limit of ₹2000.00.",
+  "payment_status": null,
+  "razorpay_order_id": null
+}
+```
 
 ---
 
