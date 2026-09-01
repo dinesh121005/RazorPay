@@ -2,18 +2,18 @@
 Tests for Phase 6 — SQLite Audit Trail.
 
 Covers:
-1. Unit tests for AuditStore (table creation, two-phase writes, listing with filters, get).
-2. End-to-end integration tests via TestClient (purchase flow -> audit record verification).
-3. Query and filter tests on GET /audit.
-4. 404 behavior on GET /audit/{transaction_id}.
-5. Terminal state verification (approved with payment, rejected with NULL payment, payment failed).
+1. Unit tests for AuditStore (table creation, two-phase writes, PENDING state, listing with filters, get).
+2. Authentication checks on /audit endpoints (401 on unauthorized).
+3. End-to-end integration tests via TestClient (purchase flow -> audit record verification).
+4. Query and filter tests on GET /audit.
+5. 404 behavior on GET /audit/{transaction_id}.
+6. Terminal state verification (approved with payment, rejected with NULL payment, payment failed).
 """
-from datetime import datetime, timezone
 from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from app.audit import AuditRecord, AuditStore, audit_store
+from app.audit import AuditRecord, AuditStore
 from app.main import app
 
 client = TestClient(app)
@@ -29,31 +29,20 @@ _FAKE_ORDER = {
 }
 
 
-@pytest.fixture(autouse=True)
-def isolate_test_db(tmp_path, monkeypatch):
-    """
-    Ensure all tests run against a clean, isolated SQLite database file
-    and never pollute or depend on the production gateway.db file.
-    """
-    test_db = str(tmp_path / "test_gateway.db")
-    monkeypatch.setattr(audit_store, "db_path", test_db)
-    audit_store._init_db()
-    yield test_db
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. AuditStore Unit Tests
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_audit_store_write_proposal_phase_a(tmp_path):
     """
-    Phase A: write_proposal creates an audit record with NULL payment fields.
+    Phase A: write_proposal creates an audit record with PENDING payment status for APPROVED,
+    and NULL for REJECTED.
     """
     store = AuditStore(db_path=str(tmp_path / "unit_test_a.db"))
-    txn_id = "txn-unit-001"
+    txn_id_app = "txn-unit-001"
 
     store.write_proposal(
-        transaction_id=txn_id,
+        transaction_id=txn_id_app,
         customer_id="CUST001",
         product_id="KB001",
         merchant_id="MERCH_ELEC",
@@ -63,9 +52,9 @@ def test_audit_store_write_proposal_phase_a(tmp_path):
         decision_reason="Transaction amount ₹1499.00 is within mandate limit of ₹2000.00.",
     )
 
-    record = store.get(txn_id)
+    record = store.get(txn_id_app)
     assert record is not None
-    assert record.transaction_id == txn_id
+    assert record.transaction_id == txn_id_app
     assert record.customer_id == "CUST001"
     assert record.product_id == "KB001"
     assert record.merchant_id == "MERCH_ELEC"
@@ -73,9 +62,26 @@ def test_audit_store_write_proposal_phase_a(tmp_path):
     assert record.amount == 1499.0
     assert record.decision == "APPROVED"
     assert "within mandate limit" in record.decision_reason
-    assert record.payment_status is None
+    assert record.payment_status == "PENDING"
     assert record.razorpay_order_id is None
     assert record.timestamp is not None
+
+    # Test rejected proposal has payment_status=None (NULL)
+    txn_id_rej = "txn-unit-002"
+    store.write_proposal(
+        transaction_id=txn_id_rej,
+        customer_id="CUST001",
+        product_id="MN001",
+        merchant_id="MERCH_ELEC",
+        quantity=1,
+        amount=4999.0,
+        decision="REJECTED",
+        decision_reason="Exceeds limit",
+    )
+    rej_record = store.get(txn_id_rej)
+    assert rej_record is not None
+    assert rej_record.decision == "REJECTED"
+    assert rej_record.payment_status is None
 
 
 def test_audit_store_update_payment_outcome_phase_b(tmp_path):
@@ -107,6 +113,20 @@ def test_audit_store_update_payment_outcome_phase_b(tmp_path):
     assert record.decision == "APPROVED"
     assert record.payment_status == "created"
     assert record.razorpay_order_id == "order_Razorpay_XYZ999"
+
+
+def test_audit_store_update_nonexistent_record_raises_error(tmp_path):
+    """
+    Phase B on missing row raises ValueError (validating cursor.rowcount).
+    """
+    store = AuditStore(db_path=str(tmp_path / "unit_test_missing.db"))
+    with pytest.raises(ValueError) as exc_info:
+        store.update_payment_outcome(
+            transaction_id="non-existent-txn-id",
+            payment_status="created",
+            razorpay_order_id="order_xyz",
+        )
+    assert "not found" in str(exc_info.value)
 
 
 def test_audit_store_update_payment_failure(tmp_path):
@@ -215,10 +235,25 @@ def test_audit_store_get_not_found(tmp_path):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 2. End-to-End Integration Tests via TestClient
+# 2. Authentication & Authorization
 # ══════════════════════════════════════════════════════════════════════════════
 
-def test_purchase_approved_creates_complete_audit_record():
+def test_audit_endpoints_require_authentication():
+    """
+    GET /audit and GET /audit/{id} must return 401 when accessed without admin auth.
+    """
+    res_list = client.get("/audit")
+    assert res_list.status_code == 401
+
+    res_get = client.get("/audit/some-id")
+    assert res_get.status_code == 401
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. End-to-End Integration Tests via TestClient
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_purchase_approved_creates_complete_audit_record(admin_headers):
     """
     Canonical Approved Case: CUST001 + KB001 (₹1,499 <= ₹2,000)
     1. POST /agent/purchase -> returns 200 APPROVED + payment status 'created'.
@@ -240,7 +275,7 @@ def test_purchase_approved_creates_complete_audit_record():
     expected_order_id = resp_data["payment"]["razorpay_order_id"]
 
     # Verify audit record via API
-    audit_resp = client.get(f"/audit/{txn_id}")
+    audit_resp = client.get(f"/audit/{txn_id}", headers=admin_headers)
     assert audit_resp.status_code == 200
     audit_data = audit_resp.json()
 
@@ -257,7 +292,7 @@ def test_purchase_approved_creates_complete_audit_record():
     assert audit_data["timestamp"] is not None
 
 
-def test_purchase_rejected_creates_terminal_audit_record():
+def test_purchase_rejected_creates_terminal_audit_record(admin_headers):
     """
     Canonical Rejected Case: CUST001 + MN001 (₹4,999 > ₹2,000)
     1. POST /agent/purchase -> returns 200 REJECTED, payment is None.
@@ -278,7 +313,7 @@ def test_purchase_rejected_creates_terminal_audit_record():
     assert resp_data["decision"] == "REJECTED"
 
     # Verify audit record
-    audit_resp = client.get(f"/audit/{txn_id}")
+    audit_resp = client.get(f"/audit/{txn_id}", headers=admin_headers)
     assert audit_resp.status_code == 200
     audit_data = audit_resp.json()
 
@@ -294,7 +329,7 @@ def test_purchase_rejected_creates_terminal_audit_record():
     assert audit_data["razorpay_order_id"] is None
 
 
-def test_purchase_payment_failure_recorded_in_audit():
+def test_purchase_payment_failure_recorded_in_audit(admin_headers):
     """
     Payment Failure Case: Approved by policy, but Razorpay SDK raises exception.
     Audit row records decision='APPROVED' with payment_status='failed'.
@@ -313,7 +348,7 @@ def test_purchase_payment_failure_recorded_in_audit():
     assert resp_data["payment"]["status"] == "failed"
 
     # Verify audit record reflects payment failure
-    audit_resp = client.get(f"/audit/{txn_id}")
+    audit_resp = client.get(f"/audit/{txn_id}", headers=admin_headers)
     assert audit_resp.status_code == 200
     audit_data = audit_resp.json()
 
@@ -323,7 +358,7 @@ def test_purchase_payment_failure_recorded_in_audit():
     assert audit_data["razorpay_order_id"] is None
 
 
-def test_get_audit_endpoints_and_filtering():
+def test_get_audit_endpoints_and_filtering(admin_headers):
     """
     Verify GET /audit lists records and properly applies query filters.
     """
@@ -352,7 +387,7 @@ def test_get_audit_endpoints_and_filtering():
     txn3 = resp3.json()["transaction_id"]
 
     # 2. GET /audit without filters -> returns all 3
-    list_all = client.get("/audit")
+    list_all = client.get("/audit", headers=admin_headers)
     assert list_all.status_code == 200
     records = list_all.json()
     assert len(records) == 3
@@ -360,7 +395,7 @@ def test_get_audit_endpoints_and_filtering():
     assert txn3 in ids and txn2 in ids and txn1 in ids
 
     # 3. GET /audit?customer_id=CUST002
-    list_cust2 = client.get("/audit", params={"customer_id": "CUST002"})
+    list_cust2 = client.get("/audit", params={"customer_id": "CUST002"}, headers=admin_headers)
     assert list_cust2.status_code == 200
     cust2_records = list_cust2.json()
     assert len(cust2_records) == 1
@@ -368,24 +403,61 @@ def test_get_audit_endpoints_and_filtering():
     assert cust2_records[0]["decision"] == "REJECTED"
 
     # 4. GET /audit?decision=APPROVED
-    list_approved = client.get("/audit", params={"decision": "APPROVED"})
+    list_approved = client.get("/audit", params={"decision": "APPROVED"}, headers=admin_headers)
     assert list_approved.status_code == 200
     approved_records = list_approved.json()
     assert len(approved_records) == 1
     assert approved_records[0]["transaction_id"] == txn1
 
     # 5. GET /audit?decision=REJECTED
-    list_rejected = client.get("/audit", params={"decision": "REJECTED"})
+    list_rejected = client.get("/audit", params={"decision": "REJECTED"}, headers=admin_headers)
     assert list_rejected.status_code == 200
     rejected_records = list_rejected.json()
     assert len(rejected_records) == 2
 
+    # 6. GET /audit?payment_status=created
+    list_created = client.get("/audit", params={"payment_status": "created"}, headers=admin_headers)
+    assert list_created.status_code == 200
+    created_records = list_created.json()
+    assert len(created_records) == 1
+    assert created_records[0]["transaction_id"] == txn1
 
-def test_get_audit_record_not_found_returns_404():
+
+def test_purchase_missing_status_recorded_as_status_unknown_in_audit(admin_headers):
+    """
+    When Razorpay returns response without 'status', audit record records payment_status='status_unknown'
+    and is filterable separately from 'created' and 'failed'.
+    """
+    with patch(_CREATE_ORDER, return_value={"id": "order_UnknownStatus999"}):
+        resp = client.post("/agent/purchase", json={
+            "customer_id": "CUST001",
+            "product_id": "KB001",
+            "quantity": 1,
+        })
+    assert resp.status_code == 200
+    txn_id = resp.json()["transaction_id"]
+    assert resp.json()["payment"]["status"] == "status_unknown"
+
+    # Verify audit record
+    audit_resp = client.get(f"/audit/{txn_id}", headers=admin_headers)
+    assert audit_resp.status_code == 200
+    audit_data = audit_resp.json()
+    assert audit_data["payment_status"] == "status_unknown"
+    assert audit_data["razorpay_order_id"] == "order_UnknownStatus999"
+
+    # Verify filtering by payment_status=status_unknown
+    filter_resp = client.get("/audit", params={"payment_status": "status_unknown"}, headers=admin_headers)
+    assert filter_resp.status_code == 200
+    filter_records = filter_resp.json()
+    assert len(filter_records) >= 1
+    assert any(r["transaction_id"] == txn_id for r in filter_records)
+
+
+def test_get_audit_record_not_found_returns_404(admin_headers):
     """
     GET /audit/{unknown_transaction_id} returns HTTP 404 with descriptive error.
     """
-    response = client.get("/audit/00000000-0000-0000-0000-000000000000")
+    response = client.get("/audit/00000000-0000-0000-0000-000000000000", headers=admin_headers)
     assert response.status_code == 404
     data = response.json()
     assert "detail" in data

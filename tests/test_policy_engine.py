@@ -372,3 +372,78 @@ def test_mandate_store_seeded_from_demo_mandates():
     expected_mandate = DEMO_MANDATES["CUST001"]
 
     assert stored_mandate == expected_mandate
+
+
+# ==========================================
+# 9. Mandate Expiration Boundary Tests (L4)
+# ==========================================
+
+def test_mandate_is_expired_none():
+    """Mandate with expires_at=None is never expired."""
+    mandate = Mandate(
+        customer_id="CUST001",
+        max_transaction_amount=2000.0,
+        allowed_categories=["electronics"],
+        allowed_merchants=["MERCH_ELEC"],
+        expires_at=None,
+    )
+    assert mandate.is_expired() is False
+
+
+def test_mandate_is_expired_exact_boundary():
+    """
+    At exact boundary (now == expires_at), mandate is still valid (not expired).
+    Only now > expires_at is considered expired.
+    """
+    fixed_time = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+    mandate = Mandate(
+        customer_id="CUST001",
+        max_transaction_amount=2000.0,
+        allowed_categories=["electronics"],
+        allowed_merchants=["MERCH_ELEC"],
+        expires_at=fixed_time,
+    )
+
+    # 1 second before -> False
+    assert mandate.is_expired(now=fixed_time - timedelta(seconds=1)) is False
+
+    # Exact time -> False (inclusive boundary)
+    assert mandate.is_expired(now=fixed_time) is False
+
+    # 1 second after -> True (expired)
+    assert mandate.is_expired(now=fixed_time + timedelta(seconds=1)) is True
+
+
+def test_mandate_is_expired_naive_datetime_handling():
+    """Naive datetimes are treated as UTC without raising TypeError."""
+    naive_expiry = datetime(2026, 9, 1, 12, 0, 0)
+    mandate = Mandate(
+        customer_id="CUST001",
+        max_transaction_amount=2000.0,
+        allowed_categories=["electronics"],
+        allowed_merchants=["MERCH_ELEC"],
+        expires_at=naive_expiry,
+    )
+
+    naive_now_before = datetime(2026, 9, 1, 11, 0, 0)
+    naive_now_after = datetime(2026, 9, 1, 13, 0, 0)
+
+    assert mandate.is_expired(now=naive_now_before) is False
+    assert mandate.is_expired(now=naive_now_after) is True
+
+
+def test_mandate_store_save_mandate():
+    """MandateStore.save_mandate correctly stores a mandate."""
+    store = MandateStore()
+    custom_mandate = Mandate(
+        customer_id="CUST_CUSTOM",
+        max_transaction_amount=3000.0,
+        allowed_categories=["apparel"],
+        allowed_merchants=["MERCH_ELEC"],
+    )
+    store.save_mandate(custom_mandate)
+    retrieved = store.get_mandate("CUST_CUSTOM")
+    assert retrieved is not None
+    assert retrieved.customer_id == "CUST_CUSTOM"
+    assert retrieved.max_transaction_amount == 3000.0
+

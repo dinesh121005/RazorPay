@@ -1,41 +1,196 @@
 """
-Model Context Protocol (MCP) server entrypoint for ai-buyer-gateway.
+Model Context Protocol (MCP) server entrypoint and remote Streamable HTTP application.
 
-Runs over stdio transport, enabling MCP-aware AI clients (such as Claude Desktop)
-to natively invoke the gateway's propose_purchase tool.
+Supports:
+1. Local stdio transport (python -m app.mcp.server) for single-user local Claude Desktop usage.
+2. Remote Streamable HTTP transport mounted at /mcp on the FastAPI application with OAuth Bearer authentication.
 """
+from typing import Optional
 from dotenv import load_dotenv
 
 # Ensure environment variables (.env) are loaded before server starts
 load_dotenv(override=False)
 
+import jwt
+from fastapi import FastAPI
 from mcp.server.mcpserver import MCPServer
-from app.mcp.tools import register_tools
+from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+from app.mcp.tools import (
+    authenticated_customer_id,
+    register_remote_tools,
+    register_tools,
+)
+from app.oauth.crypto import verify_access_token
+
+
+class McpAuthMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware enforcing valid OAuth 2.1 JWT Bearer token authentication on all remote MCP requests.
+    Extracts customer_id from token's `sub` claim and binds it to contextvars.
+    """
+    async def dispatch(self, request: Request, call_next):
+        # Allow OPTIONS for CORS preflight
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        auth_header = request.headers.get("Authorization")
+        base_auth_header = {
+            "WWW-Authenticate": (
+                'Bearer realm="ai-buyer-gateway", '
+                'resource_metadata="/.well-known/oauth-protected-resource", '
+                'as_uri="/.well-known/oauth-authorization-server"'
+            )
+        }
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                status_code=401,
+                headers=base_auth_header,
+                content={
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32001,
+                        "message": "Unauthorized: Missing or malformed Bearer token in Authorization header."
+                    }
+                }
+            )
+
+        token = auth_header[7:].strip()
+        try:
+            payload = verify_access_token(token)
+            customer_id = payload.get("sub")
+            if not customer_id:
+                return JSONResponse(
+                    status_code=401,
+                    headers=base_auth_header,
+                    content={
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32001,
+                            "message": "Unauthorized: Access token missing 'sub' claim."
+                        }
+                    }
+                )
+            
+            # Bind verified customer_id to async request context
+            token_reset = authenticated_customer_id.set(customer_id)
+            try:
+                response = await call_next(request)
+                return response
+            finally:
+                authenticated_customer_id.reset(token_reset)
+
+        except jwt.ExpiredSignatureError:
+            expired_headers = {
+                "WWW-Authenticate": (
+                    'Bearer realm="ai-buyer-gateway", error="invalid_token", '
+                    'error_description="The access token expired", '
+                    'resource_metadata="/.well-known/oauth-protected-resource", '
+                    'as_uri="/.well-known/oauth-authorization-server"'
+                )
+            }
+            return JSONResponse(
+                status_code=401,
+                headers=expired_headers,
+                content={
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32001,
+                        "message": "Unauthorized: Access token has expired."
+                    }
+                }
+            )
+        except jwt.PyJWTError as e:
+            invalid_headers = {
+                "WWW-Authenticate": (
+                    f'Bearer realm="ai-buyer-gateway", error="invalid_token", '
+                    f'error_description="{str(e)}", '
+                    'resource_metadata="/.well-known/oauth-protected-resource", '
+                    'as_uri="/.well-known/oauth-authorization-server"'
+                )
+            }
+            return JSONResponse(
+                status_code=401,
+                headers=invalid_headers,
+                content={
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32001,
+                        "message": f"Unauthorized: Invalid access token ({str(e)})."
+                    }
+                }
+            )
 
 
 def create_mcp_server() -> MCPServer:
     """
-    Factory function initializing the MCP server and registering all gateway tools.
+    Factory initializing local stdio MCP server instance with full demo tool set.
     """
     server = MCPServer(
         name="ai-buyer-gateway",
         instructions=(
-            "ai-buyer-gateway enables AI shopping agents to propose purchases under "
-            "deterministic customer spending mandates with real-time Razorpay Test Mode execution."
+            "ai-buyer-gateway enables autonomous Agent-to-Agent (A2A) commerce. "
+            "You are the Buyer AI Agent acting autonomously on behalf of the customer. "
+            "Whenever the user expresses purchase intent (e.g. 'i want keyboard', 'buy keyboard', 'get a monitor', 'find snacks'), "
+            "you MUST execute the purchase autonomously without asking for extra human confirmation: "
+            "1. First call `inquire_merchant` (or `search_products`) to get the product quote from the store's Merchant Sales Agent. "
+            "2. Then IMMEDIATELY call `propose_purchase` with the selected product_id and default customer_id='CUST001' in the same turn. "
+            "3. Inform the user with the final purchase confirmation and reference code."
         ),
     )
     register_tools(server)
     return server
 
 
-# Module-level server instance
+def create_remote_mcp_server() -> MCPServer:
+    """
+    Factory initializing remote OAuth-authenticated MCP server instance.
+    `propose_purchase` accepts ONLY product_id and quantity — identity is bound from JWT.
+    """
+    server = MCPServer(
+        name="ai-buyer-gateway-remote",
+        instructions=(
+            "Remote AI Buyer Gateway. Authenticated sessions automatically bind customer identity. "
+            "Propose purchases to evaluate policy mandates and execute Razorpay Test Mode orders."
+        ),
+    )
+    register_remote_tools(server)
+    return server
+
+
+def get_remote_mcp_app() -> Starlette:
+    """
+    Builds the Starlette ASGI application for Streamable HTTP transport with OAuth authentication middleware.
+    """
+    remote_server = create_remote_mcp_server()
+    streamable_app = remote_server.streamable_http_app()
+    
+    # Wrap in authentication middleware
+    app = Starlette(routes=streamable_app.routes)
+    app.add_middleware(McpAuthMiddleware)
+    return app
+
+
+# Local stdio server singleton for stdio runner
 mcp_server = create_mcp_server()
+
+
+def mount_remote_mcp(fastapi_app: FastAPI, path: str = "/mcp") -> None:
+    """
+    Mounts the authenticated remote Streamable HTTP MCP server on the FastAPI application.
+    """
+    mcp_app = get_remote_mcp_app()
+    fastapi_app.mount(path, mcp_app)
 
 
 def main() -> None:
     """
     Entrypoint when executed as a module: python -m app.mcp.server
-    Runs the stdio transport event loop for Claude Desktop.
+    Runs the stdio transport event loop for local Claude Desktop.
     """
     mcp_server.run(transport="stdio")
 

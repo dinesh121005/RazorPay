@@ -277,6 +277,45 @@ def test_service_create_order_failure_isolation():
     assert "bad response" in result.error
 
 
+def test_service_create_order_missing_status_sets_status_unknown():
+    """
+    create_order_for_approved() sets status='status_unknown' and populates error
+    when the Razorpay response dictionary omits the 'status' key.
+    """
+    with patch(_CREATE_ORDER, return_value={"id": "order_NoStatus123", "amount": 149900}):
+        result = create_order_for_approved(
+            amount_inr=1499.0,
+            receipt="txn-unit-test-003",
+            customer_id="CUST001",
+            product_id="KB001",
+        )
+
+    assert result.status == "status_unknown"
+    assert result.razorpay_order_id == "order_NoStatus123"
+    assert "missing 'status' field" in result.error
+
+
+def test_razorpay_missing_status_recorded_in_purchase_response():
+    """
+    HTTP /agent/purchase endpoint correctly surfaces status_unknown when
+    Razorpay response is missing the 'status' key.
+    """
+    with patch(_CREATE_ORDER, return_value={"id": "order_NoStatus456"}):
+        response = client.post("/agent/purchase", json={
+            "customer_id": "CUST001",
+            "product_id": "KB001",
+            "quantity": 1,
+        })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["decision"] == "APPROVED"
+    assert data["payment"] is not None
+    assert data["payment"]["status"] == "status_unknown"
+    assert data["payment"]["razorpay_order_id"] == "order_NoStatus456"
+    assert "missing 'status' field" in data["payment"]["error"]
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 6. Integration test (skipped by default — requires real Test Mode keys)
 # ══════════════════════════════════════════════════════════════════════════════

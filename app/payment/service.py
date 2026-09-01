@@ -14,8 +14,11 @@ NOT in scope (Phase 5 boundary):
 - Webhooks.
 - Refunds.
 """
+import logging
 from app.payment import razorpay_client
 from app.payment.models import PaymentResult
+
+logger = logging.getLogger("gateway.payment")
 
 # Paise per rupee — Razorpay Orders API requires integer paise.
 _PAISE_PER_RUPEE = 100
@@ -40,7 +43,7 @@ def create_order_for_approved(
     Create a Razorpay Test Mode order for a policy-approved purchase proposal.
 
     This function is called ONLY when PolicyDecision.status == "APPROVED".
-    The caller (app/agent/router.py) is responsible for the conditional guard;
+    The caller (app/agent/service.py) is responsible for the conditional guard;
     this function has no awareness of the policy decision itself.
 
     Args:
@@ -68,11 +71,29 @@ def create_order_for_approved(
             receipt=receipt,
             notes=notes,
         )
+        if not isinstance(response, dict) or "status" not in response or not response.get("status"):
+            logger.warning(
+                "Razorpay response missing 'status' field for receipt %s: %s",
+                receipt,
+                response,
+            )
+            return PaymentResult(
+                status="status_unknown",
+                razorpay_order_id=response.get("id") if isinstance(response, dict) else None,
+                error="Razorpay response missing 'status' field",
+            )
+
         return PaymentResult(
-            status="created",
-            razorpay_order_id=response["id"],
+            status=response["status"],
+            razorpay_order_id=response.get("id"),
         )
     except Exception as exc:  # noqa: BLE001 — intentional broad catch; SDK can raise many types
+        logger.warning(
+            "Razorpay order creation failed for transaction receipt %s: %s",
+            receipt,
+            exc,
+            exc_info=True,
+        )
         return PaymentResult(
             status="failed",
             error=str(exc),

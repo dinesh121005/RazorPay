@@ -52,9 +52,13 @@ class AuditRecord(BaseModel):
     )
     payment_status: Optional[str] = Field(
         default=None,
-        description="Downstream payment status: 'created' (successful order), 'failed' (SDK/network error), or None (when rejected)"
+        description="Downstream payment status: 'PENDING' (approved, awaiting payment), 'created' (successful order), 'failed' (SDK/network error), 'status_unknown' (provider omitted status), or None (when rejected)"
     )
     razorpay_order_id: Optional[str] = Field(
         default=None,
         description="Razorpay Order ID (e.g. 'order_ABC123') when payment order creation succeeded, else None"
+    )
+    idempotency_key: Optional[str] = Field(
+        default=None,
+        description="Optional client-supplied idempotency key for replay prevention"
     )

@@ -12,7 +12,7 @@ def test_health_check():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["service"] == "catalog"
+    assert data["service"] == "gateway"
     assert "version" in data
 
 
@@ -83,4 +83,41 @@ def test_get_product_by_invalid_id():
     data = response.json()
     assert "detail" in data
     assert "non_existent_id_999" in data["detail"]
+
+
+def test_search_products_by_query():
+    """6. GET /products?query=keyboard returns matching products by case-insensitive name."""
+    response = client.get("/products?query=keyboard")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == "KB001"
+    assert "Keyboard" in data[0]["name"]
+
+
+def test_search_products_by_query_case_insensitive():
+    """7. GET /products?query=mOnItOr matches 4K monitor case-insensitively."""
+    response = client.get("/products?query=mOnItOr")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == "MN001"
+
+
+def test_search_products_combined_filters():
+    """8. GET /products?query=cotton&category=apparel&max_price=1000 matches AP001."""
+    response = client.get("/products?query=cotton&category=apparel&max_price=1000")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == "AP001"
+
+
+def test_search_products_no_match():
+    """9. GET /products?query=nonexistent returns an empty list."""
+    response = client.get("/products?query=nonexistent")
+    assert response.status_code == 200
+    data = response.json()
+    assert data == []
+
 

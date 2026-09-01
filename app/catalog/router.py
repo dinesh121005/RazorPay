@@ -1,17 +1,22 @@
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.catalog.data import PRODUCTS
 from app.catalog.models import Product
+from app.catalog.service import get_product, search_products
+from app.exceptions import ProductNotFoundError
 
 router = APIRouter(prefix="/products", tags=["catalog"])
 
 
 @router.get("", response_model=List[Product], summary="List and filter catalog products")
 def list_products(
+    query: Optional[str] = Query(
+        default=None,
+        description="Filter products by product name (case-insensitive substring)"
+    ),
     category: Optional[str] = Query(
         default=None,
-        description="Filter products by category name (case-insensitive)"
+        description="Filter products by category name (case-insensitive exact match)"
     ),
     max_price: Optional[float] = Query(
         default=None,
@@ -21,35 +26,22 @@ def list_products(
 ) -> List[Product]:
     """
     Retrieve products from the catalog.
-    Supports optional filtering by category and maximum price.
+    Supports optional filtering by keyword query, category, and maximum price.
     """
-    filtered_products = PRODUCTS
-
-    if category is not None:
-        target_category = category.strip().lower()
-        filtered_products = [
-            p for p in filtered_products if p.category.lower() == target_category
-        ]
-
-    if max_price is not None:
-        filtered_products = [
-            p for p in filtered_products if p.price <= max_price
-        ]
-
-    return filtered_products
+    return search_products(query=query, category=category, max_price=max_price)
 
 
 @router.get("/{id}", response_model=Product, summary="Get product details by ID")
-def get_product(id: str) -> Product:
+def get_product_endpoint(id: str) -> Product:
     """
     Retrieve single product details by product ID.
     Returns 404 if the product is not found in the catalog.
     """
-    for product in PRODUCTS:
-        if product.id == id:
-            return product
+    try:
+        return get_product(id)
+    except ProductNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Product with id '{id}' not found"
-    )

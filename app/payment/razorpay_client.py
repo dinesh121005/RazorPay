@@ -8,9 +8,11 @@ Design: lazy singleton — the SDK client is not instantiated at import time,
 so `pytest` collection works without RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET set.
 The real client is created on the first call to get_client().
 """
+import logging
 import os
 import razorpay
 
+_logger = logging.getLogger("gateway.payment.client")
 _client = None
 
 
