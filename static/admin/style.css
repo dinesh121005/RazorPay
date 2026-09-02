@@ -1050,3 +1050,46 @@ body {
   .overview-statusbar { align-items: flex-start; flex-direction: column; }
   .form-row, .btn-group { flex-direction: column; }
 }
+
+/* Finish: accessibility, tactile controls, and compact operations ergonomics */
+::selection { background: rgba(124, 131, 255, 0.38); color: #fff; }
+
+html { scrollbar-color: #3b4763 #0b101c; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0b101c; }
+::-webkit-scrollbar-thumb { background: #34415c; border: 3px solid #0b101c; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #4c5b7b; }
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(140, 147, 255, 0.45);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  border: 1px solid rgba(187, 191, 255, 0.26);
+  letter-spacing: 0.005em;
+}
+
+.btn-primary:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+
+.input::placeholder, .textarea::placeholder { color: #67748d; opacity: 1; }
+.select { color-scheme: dark; cursor: pointer; }
+
+.filter-bar {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10);
+}
+
+.recent-card .card-header { align-items: flex-start; }
+.recent-card .btn-ghost { margin-top: 0.15rem; white-space: nowrap; }
+.integrity-card .card-header { align-items: flex-start; }
+.integrity-card .card-title { margin-top: 0.18rem; }
+.integrity-mark { font-size: 1rem; font-weight: 800; }
+
+@media (max-width: 760px) {
+  .recent-card .card-header { gap: 0.75rem; }
+  .recent-card .btn-ghost { padding-right: 0; }
+}

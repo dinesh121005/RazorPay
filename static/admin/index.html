@@ -173,30 +173,59 @@
           </div>
         </div>
 
-        <!-- Recent Audit Entries -->
-        <div class="card mt-6">
-          <div class="card-header">
-            <h3 class="card-title">Recent Transactions</h3>
-            <button class="btn btn-ghost btn-sm" data-goto-tab="audit">View All Audit Records →</button>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Reference</th>
-                  <th>Customer</th>
-                  <th>Product</th>
-                  <th>Amount</th>
-                  <th>Decision</th>
-                  <th>Payment Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="recent-transactions-tbody">
-                <tr><td colspan="8" class="text-center py-6 text-muted">Loading recent transactions...</td></tr>
-              </tbody>
-            </table>
+        <div class="overview-lower mt-6">
+          <aside class="card integrity-card" aria-label="System integrity status">
+            <div class="card-header">
+              <div>
+                <p class="card-eyebrow">System health</p>
+                <h3 class="card-title">Protected by design</h3>
+              </div>
+              <span class="integrity-mark" aria-label="All systems operational">✓</span>
+            </div>
+            <div class="integrity-list">
+              <div>
+                <span class="integrity-dot"></span>
+                <div><strong>Policy controls</strong><small>Every proposal is evaluated before execution.</small></div>
+              </div>
+              <div>
+                <span class="integrity-dot"></span>
+                <div><strong>Audit ledger</strong><small>Decisions and payment references are retained.</small></div>
+              </div>
+              <div>
+                <span class="integrity-dot"></span>
+                <div><strong>Payment rails</strong><small>Connected in Razorpay test mode.</small></div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Recent Audit Entries -->
+          <div class="card recent-card">
+            <div class="card-header">
+              <div>
+                <p class="card-eyebrow">Live ledger</p>
+                <h3 class="card-title">Recent transactions</h3>
+              </div>
+              <button class="btn btn-ghost btn-sm" data-goto-tab="audit">View audit ledger <span aria-hidden="true">→</span></button>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Reference</th>
+                    <th>Customer</th>
+                    <th>Product</th>
+                    <th>Amount</th>
+                    <th>Decision</th>
+                    <th>Payment Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-transactions-tbody">
+                  <tr><td colspan="8" class="text-center py-6 text-muted">Loading recent transactions...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
