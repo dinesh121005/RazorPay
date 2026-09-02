@@ -76,13 +76,8 @@ class AuditStore:
                 );
                 """
             )
-            # Migration check: add idempotency_key column if table was created in earlier schema
-            cursor.execute("PRAGMA table_info(audit_records);")
-            columns = [col[1] for col in cursor.fetchall()]
-            if "idempotency_key" not in columns:
-                cursor.execute("ALTER TABLE audit_records ADD COLUMN idempotency_key TEXT;")
             cursor.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_idempotency_key ON audit_records(idempotency_key) WHERE idempotency_key IS NOT NULL;"
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_idempotency_key ON audit_records(idempotency_key);"
             )
             conn.commit()
 
