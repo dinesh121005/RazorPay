@@ -1,5 +1,7 @@
 import base64
+import html
 import json
+import os
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -477,95 +479,118 @@ async def google_callback(
             detail="Missing authorization code or state from Google."
         )
 
-    # Unpack state
+    import logging
+    logger = logging.getLogger("gateway.oauth")
+
     try:
-        decoded_state_json = base64.urlsafe_b64decode(state.encode("utf-8")).decode("utf-8")
-        state_data = json.loads(decoded_state_json)
-        client_id = state_data["client_id"]
-        redirect_uri = state_data["redirect_uri"]
-        client_state = state_data.get("state")
-        client_scope = state_data.get("scope", "purchase")
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or malformed state parameter."
-        )
-
-    # Exchange code for Google ID token / access token
-    async with httpx.AsyncClient() as http_client:
-        token_res = await http_client.post(
-            "https://oauth2.googleapis.com/token",
-            data={
-                "code": code,
-                "client_id": GOOGLE_CLIENT_ID,
-                "client_secret": GOOGLE_CLIENT_SECRET,
-                "redirect_uri": GOOGLE_REDIRECT_URI,
-                "grant_type": "authorization_code",
-            },
-            headers={"Accept": "application/json"},
-            timeout=15.0,
-        )
-        if token_res.status_code != 200:
+        # Unpack state
+        try:
+            decoded_state_json = base64.urlsafe_b64decode(state.encode("utf-8")).decode("utf-8")
+            state_data = json.loads(decoded_state_json)
+            client_id = state_data["client_id"]
+            redirect_uri = state_data["redirect_uri"]
+            client_state = state_data.get("state")
+            client_scope = state_data.get("scope", "purchase")
+        except Exception as e:
+            logger.error("Failed to decode Google OAuth state parameter: %s", e)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to exchange token with Google: {token_res.text}"
+                detail="Invalid or malformed state parameter."
             )
 
-        token_json = token_res.json()
-        google_access_token = token_json.get("access_token")
-        if not google_access_token:
+        client_id_val = os.getenv("GOOGLE_CLIENT_ID", GOOGLE_CLIENT_ID)
+        client_secret_val = os.getenv("GOOGLE_CLIENT_SECRET", GOOGLE_CLIENT_SECRET)
+        redirect_uri_val = os.getenv("GOOGLE_REDIRECT_URI", GOOGLE_REDIRECT_URI)
+
+        # Exchange code for Google ID token / access token
+        async with httpx.AsyncClient() as http_client:
+            token_res = await http_client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": client_id_val,
+                    "client_secret": client_secret_val,
+                    "redirect_uri": redirect_uri_val,
+                    "grant_type": "authorization_code",
+                },
+                headers={"Accept": "application/json"},
+                timeout=15.0,
+            )
+            if token_res.status_code != 200:
+                logger.error("Google token exchange failed (%s): %s", token_res.status_code, token_res.text)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to exchange token with Google: {token_res.text}"
+                )
+
+            token_json = token_res.json()
+            google_access_token = token_json.get("access_token")
+            if not google_access_token:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No access token returned by Google."
+                )
+
+            # Fetch Google user profile
+            userinfo_res = await http_client.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {google_access_token}"},
+                timeout=15.0,
+            )
+            if userinfo_res.status_code != 200:
+                logger.error("Google userinfo fetch failed (%s): %s", userinfo_res.status_code, userinfo_res.text)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Failed to fetch Google user profile."
+                )
+
+            userinfo = userinfo_res.json()
+            email = userinfo.get("email")
+            name = userinfo.get("name") or (email.split("@")[0] if email else "Google User")
+
+        if not email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No access token returned by Google."
+                detail="Google profile did not provide an email address."
             )
 
-        # Fetch Google user profile
-        userinfo_res = await http_client.get(
-            "https://www.googleapis.com/oauth2/v3/userinfo",
-            headers={"Authorization": f"Bearer {google_access_token}"},
-            timeout=15.0,
-        )
-        if userinfo_res.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to fetch Google user profile."
+        # Check if customer already exists, otherwise auto-provision
+        existing_user = customer_auth_store.get_user_by_email(email)
+        if existing_user:
+            customer_id = existing_user.customer_id
+        else:
+            customer_id, _ = provision_new_customer(
+                display_name=name,
+                email=email,
+                initial_budget=2000.0,
             )
 
-        userinfo = userinfo_res.json()
-        email = userinfo.get("email")
-        name = userinfo.get("name") or (email.split("@")[0] if email else "Google User")
-
-    if not email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Google profile did not provide an email address."
+        # Issue gateway authorization code
+        auth_code = auth_code_store.issue_code(
+            customer_id=customer_id,
+            client_id=client_id,
+            redirect_uri=redirect_uri,
+            scope=client_scope or "purchase",
         )
 
-    # Check if customer already exists, otherwise auto-provision
-    existing_user = customer_auth_store.get_user_by_email(email)
-    if existing_user:
-        customer_id = existing_user.customer_id
-    else:
-        customer_id, _ = provision_new_customer(
-            display_name=name,
-            email=email,
-            initial_budget=2000.0,
+        query_params = {"code": auth_code}
+        if client_state:
+            query_params["state"] = client_state
+
+        target_url = f"{redirect_uri}?{urlencode(query_params)}"
+        return RedirectResponse(url=target_url, status_code=status.HTTP_302_FOUND)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Unexpected error in google_callback: %s", e, exc_info=True)
+        return HTMLResponse(
+            f"""<!DOCTYPE html><html><body style="font-family:sans-serif;background:#0d1117;color:#f0f6fc;padding:40px;">
+            <h2>Google Sign-In Error</h2><p style="color:#f85149;">{html.escape(str(e))}</p>
+            <p><a href="/oauth/authorize?client_id=claude-desktop-client" style="color:#58a6ff;">Return to Sign In</a></p>
+            </body></html>""",
+            status_code=500
         )
-
-    # Issue gateway authorization code
-    auth_code = auth_code_store.issue_code(
-        customer_id=customer_id,
-        client_id=client_id,
-        redirect_uri=redirect_uri,
-        scope=client_scope or "purchase",
-    )
-
-    query_params = {"code": auth_code}
-    if client_state:
-        query_params["state"] = client_state
-
-    target_url = f"{redirect_uri}?{urlencode(query_params)}"
-    return RedirectResponse(url=target_url, status_code=status.HTTP_302_FOUND)
 
 
 @router.post(

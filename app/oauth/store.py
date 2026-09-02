@@ -8,7 +8,7 @@ import os
 import secrets
 import sqlite3
 import time
-from typing import Dict, Generator, List, Optional, Set, Tuple
+from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 
 from app.oauth.crypto import hash_password, verify_password
 from app.oauth.models import CustomerCredentials
@@ -145,13 +145,12 @@ class CustomerAuthStore:
         self._initialized = False
 
     @contextlib.contextmanager
-    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Create a new SQLite database connection with explicit retry timeout and ensure it is closed upon completion."""
-        conn = sqlite3.connect(self.db_path, timeout=5.0)
-        try:
+    def _get_connection(self) -> Generator[Any, None, None]:
+        """Create a new database connection (SQLite or PostgreSQL) via universal connection manager."""
+        from app.db import get_db_connection
+        with get_db_connection(self.db_path) as conn:
             yield conn
-        finally:
-            conn.close()
+
 
     def _ensure_db_initialized(self) -> None:
         """Ensure the table schema and seeds exist before operations."""

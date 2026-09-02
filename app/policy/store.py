@@ -4,7 +4,7 @@ import json
 import os
 import sqlite3
 import time
-from typing import Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 from app.policy.mandate import Mandate
 
 # Single source of truth for initial demo customer mandates
@@ -62,13 +62,12 @@ class MandateStore:
         self._initialized = False
 
     @contextlib.contextmanager
-    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Create a new SQLite connection with retry timeout."""
-        conn = sqlite3.connect(self.db_path, timeout=5.0)
-        try:
+    def _get_connection(self) -> Generator[Any, None, None]:
+        """Create a new database connection (SQLite or PostgreSQL) via universal connection manager."""
+        from app.db import get_db_connection
+        with get_db_connection(self.db_path) as conn:
             yield conn
-        finally:
-            conn.close()
+
 
     def _ensure_db_initialized(self) -> None:
         """Ensure customer_mandates table exists and seed demo data."""

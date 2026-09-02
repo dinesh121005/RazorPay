@@ -8,7 +8,7 @@ import contextlib
 from datetime import datetime, timezone
 import os
 import sqlite3
-from typing import Generator, List, Optional
+from typing import Any, Generator, List, Optional
 
 from app.audit.models import AuditRecord
 
@@ -41,13 +41,12 @@ class AuditStore:
         self._initialized = False
 
     @contextlib.contextmanager
-    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Create a new SQLite database connection with explicit retry timeout and ensure it is closed upon completion."""
-        conn = sqlite3.connect(self.db_path, timeout=5.0)
-        try:
+    def _get_connection(self) -> Generator[Any, None, None]:
+        """Create a new database connection (SQLite or PostgreSQL) via universal connection manager."""
+        from app.db import get_db_connection
+        with get_db_connection(self.db_path) as conn:
             yield conn
-        finally:
-            conn.close()
+
 
     def _ensure_db_initialized(self) -> None:
         """Ensure the table schema exists before operations."""
