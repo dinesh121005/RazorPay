@@ -42,11 +42,16 @@ class PostgresCursorWrapper:
 
     def execute(self, query: str, params: Optional[Sequence[Any]] = None) -> Any:
         clean_query = query
+        # Translate SQLite INSERT OR IGNORE INTO
+        if "INSERT OR IGNORE INTO" in clean_query:
+            clean_query = clean_query.replace("INSERT OR IGNORE INTO", "INSERT INTO")
+            if "ON CONFLICT" not in clean_query:
+                clean_query = clean_query.rstrip("; ") + " ON CONFLICT DO NOTHING"
+
         # Translate SQLite ? placeholders to PostgreSQL %s
         if "?" in clean_query:
             clean_query = clean_query.replace("?", "%s")
-        # Translate SQLite ON CONFLICT(customer_id) syntax if needed
-        # (PostgreSQL 9.5+ natively supports ON CONFLICT(column))
+
         if params is not None:
             return self._cursor.execute(clean_query, tuple(params))
         return self._cursor.execute(clean_query)
