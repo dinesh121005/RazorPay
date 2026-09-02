@@ -21,12 +21,11 @@
         </svg>
       </div>
       <div class="header-title-group">
+        <span class="eyebrow">Command centre</span>
         <h1 class="header-title">Agentic Commerce Gateway</h1>
-        <span class="header-subtitle">Admin Operations & Audit Control</span>
       </div>
       <div class="env-badges">
         <span class="badge badge-pulse"><span class="pulse-dot"></span> Razorpay Test Mode</span>
-        <span class="badge badge-neutral">SQLite Ledger</span>
       </div>
     </div>
     
@@ -41,7 +40,7 @@
           <span id="refresh-text">Refresh Data</span>
         </button>
         <label class="toggle-label text-xs text-muted" title="Toggle automatic polling">
-          <input type="checkbox" id="auto-refresh-toggle"> Live Auto-Sync
+          <input type="checkbox" id="auto-refresh-toggle"> Live sync
         </label>
       </div>
 
@@ -119,12 +118,18 @@
       <section id="tab-overview" class="tab-pane active">
         <div class="section-header">
           <div>
-            <h2 class="section-title">Gateway Telemetry</h2>
-            <p class="section-subtitle">Real-time spending metrics and policy execution overview</p>
+            <p class="section-kicker">Operations overview</p>
+            <h2 class="section-title">Commerce, under control.</h2>
+            <p class="section-subtitle">A live view of agent activity, policy decisions, and payment state.</p>
           </div>
           <button class="btn btn-primary btn-sm" id="quick-test-btn">
             <span>⚡ Run Agent Test</span>
           </button>
+        </div>
+
+        <div class="overview-statusbar">
+          <div class="statusbar-copy"><span class="status-orb"></span><span>Policy engine and audit ledger are active</span></div>
+          <span class="mono text-xs" id="last-synced-label">Awaiting first sync</span>
         </div>
 
         <!-- Metric Cards -->

@@ -42,6 +42,7 @@ class AdminDashboard {
     this.kpiProgress = document.getElementById("kpi-progress");
     this.kpiMandateCount = document.getElementById("kpi-mandate-count");
     this.auditCountBadge = document.getElementById("audit-count-badge");
+    this.lastSyncedLabel = document.getElementById("last-synced-label");
 
     // Tables
     this.recentTbody = document.getElementById("recent-transactions-tbody");
@@ -260,6 +261,9 @@ class AdminDashboard {
       this.renderAuditTable();
       this.renderMandatesTable();
       this.renderCatalogGrid();
+      if (this.lastSyncedLabel) {
+        this.lastSyncedLabel.textContent = `Last synced ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+      }
     } catch (e) {
       console.error("Dashboard fetch error:", e);
     } finally {
