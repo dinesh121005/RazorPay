@@ -42,6 +42,12 @@ class PostgresCursorWrapper:
 
     def execute(self, query: str, params: Optional[Sequence[Any]] = None) -> Any:
         clean_query = query
+        # Translate SQLite AUTOINCREMENT
+        if "INTEGER PRIMARY KEY AUTOINCREMENT" in clean_query:
+            clean_query = clean_query.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+        elif "AUTOINCREMENT" in clean_query:
+            clean_query = clean_query.replace("AUTOINCREMENT", "")
+
         # Translate SQLite INSERT OR IGNORE INTO
         if "INSERT OR IGNORE INTO" in clean_query:
             clean_query = clean_query.replace("INSERT OR IGNORE INTO", "INSERT INTO")
