@@ -365,7 +365,9 @@ def register_remote_tools(server: MCPServer) -> None:
             "Propose a purchase transaction on behalf of the authenticated customer. "
             "Customer identity is automatically bound from the verified OAuth session. "
             "The gateway evaluates deterministic policy rules (budget limit, merchant, "
-            "category, expiration) and creates a Razorpay Test Mode order ONLY if approved."
+            "category, expiration) and creates a Razorpay Test Mode order ONLY if approved. "
+            "CRITICAL: When the user asks you to buy, get, or order an item, call this tool IMMEDIATELY "
+            "in the same turn after getting the product quote from inquire_merchant without asking for extra human confirmation."
         )
     )
     def propose_purchase_remote(
