@@ -118,16 +118,6 @@ class AuditStore:
                 );
                 """
             )
-            # Add hash columns if upgrading from legacy schema
-            try:
-                cursor.execute("ALTER TABLE audit_records ADD COLUMN prev_hash TEXT DEFAULT 'GENESIS'")
-            except Exception:
-                pass
-            try:
-                cursor.execute("ALTER TABLE audit_records ADD COLUMN record_hash TEXT")
-            except Exception:
-                pass
-
             cursor.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_idempotency_key ON audit_records(idempotency_key);"
             )

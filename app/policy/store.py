@@ -97,12 +97,6 @@ class MandateStore:
                 )
                 """
             )
-            try:
-                cursor.execute("ALTER TABLE customer_mandates ADD COLUMN daily_limit REAL DEFAULT 5000.0")
-                conn.commit()
-            except Exception:
-                pass
-
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_mandates_email ON customer_mandates (email)"
             )

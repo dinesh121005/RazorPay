@@ -126,6 +126,9 @@ def get_db_connection(db_path_or_url: Optional[str] = None) -> Generator[Any, No
         wrapper = PostgresConnectionWrapper(raw_conn)
         try:
             yield wrapper
+        except Exception:
+            wrapper.rollback()
+            raise
         finally:
             wrapper.close()
     else:
