@@ -162,20 +162,31 @@ def test_dynamic_customer_immediate_purchase_execution(admin_headers):
     create_res = client.post("/admin/customers", json=create_payload, headers=admin_headers)
     assert create_res.status_code == 201
 
-    # 2. Propose purchase of MN001 (₹4,999 <= ₹6,000) -> APPROVED
-    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
-        purchase_res = client.post(
-            "/agent/purchase",
-            json={"customer_id": "CUST_NEW", "product_id": "MN001", "quantity": 1}
-        )
-
+    # 2. Propose purchase of MN001 (₹4,999 <= ₹6,000) -> Gated -> Confirm -> APPROVED
+    purchase_res = client.post(
+        "/agent/purchase",
+        json={"customer_id": "CUST_NEW", "product_id": "MN001", "quantity": 1},
+        headers=admin_headers,
+    )
     assert purchase_res.status_code == 200
     data = purchase_res.json()
-    assert data["decision"] == "APPROVED"
-    assert data["product_id"] == "MN001"
-    assert data["amount"] == 4999.0
-    assert data["mandate_limit"] == 6000.0
-    assert data["payment"]["status"] == "created"
+    assert data["decision"] == "PENDING_CONFIRMATION"
+    assert data["requires_confirmation"] is True
+    token = data["confirmation_token"]
+
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
+        confirm_res = client.post(
+            "/agent/confirm",
+            json={"confirmation_token": token},
+            headers=admin_headers,
+        )
+    assert confirm_res.status_code == 200
+    confirm_data = confirm_res.json()
+    assert confirm_data["decision"] == "APPROVED"
+    assert confirm_data["product_id"] == "MN001"
+    assert confirm_data["amount"] == 4999.0
+    assert confirm_data["mandate_limit"] == 6000.0
+    assert confirm_data["payment"]["status"] == "created"
 
 
 def test_mandate_limit_patch_immediately_unlocks_purchase(admin_headers):
@@ -186,7 +197,8 @@ def test_mandate_limit_patch_immediately_unlocks_purchase(admin_headers):
     with patch(_CREATE_ORDER) as mock_create:
         res1 = client.post(
             "/agent/purchase",
-            json={"customer_id": "CUST001", "product_id": "MN001", "quantity": 1}
+            json={"customer_id": "CUST001", "product_id": "MN001", "quantity": 1},
+            headers=admin_headers,
         )
     mock_create.assert_not_called()
     assert res1.json()["decision"] == "REJECTED"
@@ -199,42 +211,63 @@ def test_mandate_limit_patch_immediately_unlocks_purchase(admin_headers):
     )
     assert patch_res.status_code == 200
 
-    # 3. MN001 is now APPROVED
-    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
-        res2 = client.post(
-            "/agent/purchase",
-            json={
-                "customer_id": "CUST001",
-                "product_id": "MN001",
-                "quantity": 1,
-                "idempotency_key": "post-limit-raise-attempt"
-            }
-        )
-    assert res2.json()["decision"] == "APPROVED"
+    # 3. MN001 is now PENDING_CONFIRMATION and can be confirmed
+    res2 = client.post(
+        "/agent/purchase",
+        json={
+            "customer_id": "CUST001",
+            "product_id": "MN001",
+            "quantity": 1,
+            "idempotency_key": "post-limit-raise-attempt",
+        },
+        headers=admin_headers,
+    )
+    assert res2.json()["decision"] == "PENDING_CONFIRMATION"
     assert res2.json()["mandate_limit"] == 10000.0
+    token = res2.json()["confirmation_token"]
+
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
+        confirm_res = client.post(
+            "/agent/confirm",
+            json={"confirmation_token": token},
+            headers=admin_headers,
+        )
+    assert confirm_res.json()["decision"] == "APPROVED"
 
 
-def test_cust001_baseline_regression():
+def test_cust001_baseline_regression(admin_headers):
     """
     Verify standard CUST001 baseline behavior is unchanged:
-    KB001 (₹1,499) -> APPROVED, MN001 (₹4,999) -> REJECTED.
+    KB001 (₹1,499) -> PENDING_CONFIRMATION -> APPROVED, MN001 (₹4,999) -> REJECTED.
     """
-    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
-        res_kb = client.post(
-            "/agent/purchase",
-            json={"customer_id": "CUST001", "product_id": "KB001", "quantity": 1}
-        )
+    res_kb = client.post(
+        "/agent/purchase",
+        json={"customer_id": "CUST001", "product_id": "KB001", "quantity": 1},
+        headers=admin_headers,
+    )
     assert res_kb.status_code == 200
-    assert res_kb.json()["decision"] == "APPROVED"
+    assert res_kb.json()["decision"] == "PENDING_CONFIRMATION"
+    token = res_kb.json()["confirmation_token"]
+
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
+        confirm_kb = client.post(
+            "/agent/confirm",
+            json={"confirmation_token": token},
+            headers=admin_headers,
+        )
+    assert confirm_kb.status_code == 200
+    assert confirm_kb.json()["decision"] == "APPROVED"
 
     with patch(_CREATE_ORDER) as mock_create:
         res_mn = client.post(
             "/agent/purchase",
-            json={"customer_id": "CUST001", "product_id": "MN001", "quantity": 1}
+            json={"customer_id": "CUST001", "product_id": "MN001", "quantity": 1},
+            headers=admin_headers,
         )
     mock_create.assert_not_called()
     assert res_mn.status_code == 200
     assert res_mn.json()["decision"] == "REJECTED"
+
 
 
 def test_admin_create_customer_provisions_working_oauth_credentials(admin_headers):

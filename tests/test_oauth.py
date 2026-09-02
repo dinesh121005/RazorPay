@@ -282,11 +282,22 @@ def test_dynamic_customer_end_to_end_oauth_purchase(admin_headers):
         )
         assert patch_res.status_code == 200
 
-        # Step 6: Propose purchase again in new time window -> APPROVED
-        with patch("time.time", return_value=1700000100.0), patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
-            res_approved = propose_purchase_remote_handler(
+        # Step 6: Propose purchase again in new time window -> PENDING_CONFIRMATION (>= ₹500)
+        from app.mcp.tools import confirm_purchase_remote_handler
+        with patch("time.time", return_value=1700000100.0), patch(_CREATE_ORDER) as mock_create_none:
+            res_proposed = propose_purchase_remote_handler(
                 product_id="KB001",
                 quantity=1,
+            )
+        mock_create_none.assert_not_called()
+        assert res_proposed["decision"] == "PENDING_CONFIRMATION"
+        assert res_proposed["requires_confirmation"] is True
+        token = res_proposed["confirmation_token"]
+
+        # Step 7: Confirm Purchase -> APPROVED
+        with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
+            res_approved = confirm_purchase_remote_handler(
+                confirmation_token=token,
             )
         mock_create.assert_called_once()
         assert res_approved["decision"] == "APPROVED"
@@ -294,6 +305,7 @@ def test_dynamic_customer_end_to_end_oauth_purchase(admin_headers):
         assert res_approved["reference_code"].startswith("REF-")
     finally:
         authenticated_customer_id.reset(token_reset)
+
 
 
 def test_oauth_authorization_server_discovery_metadata():

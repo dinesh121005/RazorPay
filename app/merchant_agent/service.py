@@ -5,12 +5,17 @@ Analyzes natural language procurement inquiries from Buyer AI Agents (e.g. Claud
 reasons over private merchant catalog & stock using real Generative LLMs (or local semantic engine),
 and formulates structured, transparent quotes.
 """
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from app.catalog.data import PRODUCTS
 from app.catalog.models import Product
 from app.merchant_agent.llm import call_llm_merchant_reasoning
-from app.merchant_agent.models import InquiryRequest, InquiryResponse, ProductQuote
+from app.merchant_agent.models import (
+    AddOnRecommendationResponse,
+    InquiryRequest,
+    InquiryResponse,
+    ProductQuote,
+)
 
 # Semantic knowledge graph mapping colloquial buyer requirements to product specifications
 SEMANTIC_FEATURE_MAP = {
@@ -33,6 +38,17 @@ SEMANTIC_FEATURE_MAP = {
     "apparel": ["cotton", "t-shirt", "crew neck"],
 }
 
+# Cross-sell affinity graph mapping product IDs to complementary add-on product IDs
+CROSS_SELL_AFFINITY_MAP: Dict[str, List[str]] = {
+    "KB001": ["HK001", "HK002"],  # Mechanical Keyboard -> Ceramic Coffee Mug (for desk), Water Bottle
+    "MN001": ["KB001", "HK001"],  # Monitor -> Mechanical Keyboard, Coffee Mug
+    "HK001": ["HK002", "AP001"],  # Coffee Mug -> Water Bottle, T-Shirt
+    "HK002": ["HK001", "AP001"],  # Water Bottle -> Coffee Mug, T-Shirt
+    "FD001": ["FD002"],           # Coconut Oil -> Rolled Oats
+    "FD002": ["FD001"],           # Rolled Oats -> Coconut Oil
+    "AP001": ["HK002", "HK001"],  # Apparel -> Water Bottle, Mug
+}
+
 
 class MerchantAgentService:
     """
@@ -45,9 +61,12 @@ class MerchantAgentService:
         """
         Processes a natural language inquiry from a Buyer Agent.
         Tries real LLM reasoning first; falls back to local semantic reasoning if offline.
+        Strictly grounds all LLM quotes against the real catalog to prevent price/stock hallucinations.
         """
         # 1. Attempt Real LLM-based Merchant Reasoning if API key is configured
         catalog_dict = [p.model_dump() for p in PRODUCTS]
+        catalog_by_id = {p.id: p for p in PRODUCTS}
+
         llm_result = call_llm_merchant_reasoning(
             query=inquiry.query,
             catalog=catalog_dict,
@@ -58,15 +77,53 @@ class MerchantAgentService:
 
         if llm_result and "quotes" in llm_result:
             try:
-                quotes = [ProductQuote(**q) for q in llm_result.get("quotes", [])]
-                best_id = llm_result.get("best_match_product_id") or (quotes[0].product_id if quotes else None)
-                notes = llm_result.get("merchant_notes", "Merchant Agent Quote formulated via LLM reasoning.")
-                return InquiryResponse(
-                    best_match_product_id=best_id,
-                    quotes=quotes,
-                    merchant_notes=notes,
-                    total_matches=len(quotes),
-                )
+                raw_quotes = llm_result.get("quotes", [])
+                validated_quotes: List[ProductQuote] = []
+                requested_qty = max(1, inquiry.quantity)
+
+                for q_dict in raw_quotes:
+                    pid = q_dict.get("product_id")
+                    if not pid or pid not in catalog_by_id:
+                        continue  # Drop hallucinated or non-existent product IDs
+
+                    real_product = catalog_by_id[pid]
+                    # Overwrite pricing and inventory with authoritative ground truth
+                    total_price = round(real_product.price * requested_qty, 2)
+                    in_stock = real_product.stock >= requested_qty
+                    within_budget = True if inquiry.max_budget is None else total_price <= inquiry.max_budget
+
+                    reasons = q_dict.get("match_reasons") or [
+                        f"Recommended by Merchant AI for query: '{inquiry.query}'"
+                    ]
+
+                    validated_quote = ProductQuote(
+                        product_id=real_product.id,
+                        name=real_product.name,
+                        category=real_product.category,
+                        price_per_unit=real_product.price,
+                        total_price=total_price,
+                        in_stock=in_stock,
+                        stock_available=real_product.stock,
+                        match_reasons=reasons,
+                        within_budget=within_budget,
+                    )
+                    validated_quotes.append(validated_quote)
+
+                if validated_quotes:
+                    best_id = llm_result.get("best_match_product_id")
+                    if not best_id or best_id not in catalog_by_id:
+                        best_id = validated_quotes[0].product_id
+
+                    notes = llm_result.get(
+                        "merchant_notes",
+                        "Merchant Agent Quote formulated via LLM reasoning grounded in live catalog.",
+                    )
+                    return InquiryResponse(
+                        best_match_product_id=best_id,
+                        quotes=validated_quotes,
+                        merchant_notes=notes,
+                        total_matches=len(validated_quotes),
+                    )
             except Exception:
                 pass  # Fall through to deterministic semantic analysis on parsing error
 
@@ -78,7 +135,7 @@ class MerchantAgentService:
         query_words = [w for w in query_clean.split() if w]
         requested_qty = max(1, inquiry.quantity)
 
-        matched_quotes: List[ProductQuote] = []
+        matched_quotes: List[Tuple[int, ProductQuote]] = []
 
         for p in PRODUCTS:
             # Check category filter if provided
@@ -149,6 +206,65 @@ class MerchantAgentService:
             total_matches=len(final_quotes),
         )
 
+    def recommend_addons(
+        self,
+        product_id: str,
+        remaining_budget: Optional[float] = None,
+    ) -> AddOnRecommendationResponse:
+        """
+        Track 01 Revenue Growth Engine: Formulates intelligent cross-sell and add-on
+        recommendations to increase merchant order basket value within mandate headroom.
+        """
+        clean_pid = product_id.strip()
+        catalog_by_id = {p.id: p for p in PRODUCTS}
+        base_product = catalog_by_id.get(clean_pid)
+
+        # Determine complementary target product IDs
+        candidate_ids = CROSS_SELL_AFFINITY_MAP.get(clean_pid, [])
+        if not candidate_ids:
+            # Fallback to other items in catalog
+            candidate_ids = [p.id for p in PRODUCTS if p.id != clean_pid]
+
+        addon_quotes: List[ProductQuote] = []
+        for cid in candidate_ids:
+            cand = catalog_by_id.get(cid)
+            if not cand or cand.stock < 1:
+                continue
+
+            within_budget = True if remaining_budget is None else cand.price <= remaining_budget
+            if remaining_budget is not None and not within_budget:
+                continue  # Only recommend items that fit within customer's available headroom
+
+            quote = ProductQuote(
+                product_id=cand.id,
+                name=cand.name,
+                category=cand.category,
+                price_per_unit=cand.price,
+                total_price=cand.price,
+                in_stock=True,
+                stock_available=cand.stock,
+                match_reasons=[
+                    f"Complementary add-on pairing with {base_product.name if base_product else clean_pid}",
+                    f"Fits within available budget headroom of ₹{remaining_budget:.2f}" if remaining_budget else "In stock for immediate dispatch",
+                ],
+                within_budget=within_budget,
+            )
+            addon_quotes.append(quote)
+
+        pitch = (
+            f"Merchant Sales Suggestion: Complete your setup with these recommended add-ons "
+            f"designed to pair perfectly with {base_product.name if base_product else clean_pid}!"
+            if addon_quotes
+            else f"No add-ons currently available fitting within the remaining headroom limit."
+        )
+
+        return AddOnRecommendationResponse(
+            base_product_id=clean_pid,
+            addons=addon_quotes,
+            merchant_pitch=pitch,
+            total_addons=len(addon_quotes),
+        )
+
     def _evaluate_product_relevance(
         self,
         product: Product,
@@ -193,3 +309,4 @@ class MerchantAgentService:
 
 
 merchant_agent_service = MerchantAgentService()
+

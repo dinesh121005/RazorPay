@@ -132,9 +132,11 @@ def test_end_to_end_a2a_inquiry_then_purchase():
     Full Agent-to-Agent flow:
     1. Buyer Agent consults Merchant Agent via inquire_merchant.
     2. Merchant Agent returns quote for KB001.
-    3. Buyer Agent submits purchase proposal for KB001 under CUST001's mandate.
-    4. Policy Engine verifies limit and executes Razorpay Test Mode order.
+    3. Buyer Agent submits purchase proposal for KB001 under CUST001's mandate -> PENDING_CONFIRMATION (>= ₹500).
+    4. Buyer Agent / Customer executes confirm_purchase -> APPROVED with Razorpay Test Mode order.
     """
+    from app.mcp.tools import confirm_purchase_handler
+
     # Step 1: Buyer Agent consults Merchant Agent
     inquiry_res = inquire_merchant_handler(
         query="clicky gaming keyboard",
@@ -143,19 +145,32 @@ def test_end_to_end_a2a_inquiry_then_purchase():
     assert inquiry_res["best_match_product_id"] == "KB001"
     recommended_product_id = inquiry_res["best_match_product_id"]
 
-    # Step 2: Buyer Agent proposes purchase for the recommended product
-    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
+    # Step 2: Buyer Agent proposes purchase for the recommended product (Gated)
+    with patch(_CREATE_ORDER) as mock_create_none:
         purchase_res = propose_purchase_handler(
             customer_id="CUST001",
             product_id=recommended_product_id,
             quantity=1,
         )
 
+    mock_create_none.assert_not_called()
+    assert purchase_res["decision"] == "PENDING_CONFIRMATION"
+    assert purchase_res["requires_confirmation"] is True
+    token = purchase_res["confirmation_token"]
+
+    # Step 3: Confirm purchase
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
+        conf_res = confirm_purchase_handler(
+            confirmation_token=token,
+            customer_id="CUST001",
+        )
+
     mock_create.assert_called_once()
-    assert purchase_res["decision"] == "APPROVED"
-    assert purchase_res["product_name"] == "Mechanical Gaming Keyboard"
-    assert purchase_res["amount"] == 1499.0
-    assert purchase_res["reference_code"].startswith("REF-")
+    assert conf_res["decision"] == "APPROVED"
+    assert conf_res["product_name"] == "Mechanical Gaming Keyboard"
+    assert conf_res["amount"] == 1499.0
+    assert conf_res["reference_code"].startswith("REF-")
+
 
 
 def test_merchant_agent_llm_reasoning_pipeline():
@@ -187,4 +202,64 @@ def test_merchant_agent_llm_reasoning_pipeline():
     assert res.best_match_product_id == "KB001"
     assert "AI Sales Agent" in res.merchant_notes
     assert res.quotes[0].match_reasons == ["Selected by Generative AI Sales Model"]
+
+
+def test_merchant_agent_llm_quote_grounding_interceptor():
+    """
+    Ensures LLM hallucinations (fake products or incorrect prices) are grounded against PRODUCTS:
+    - Hallucinated products are dropped.
+    - Hallucinated prices are overwritten with true catalog prices.
+    """
+    hallucinated_quote = {
+        "best_match_product_id": "KB001",
+        "merchant_notes": "Hallucinated response",
+        "quotes": [
+            {
+                "product_id": "KB001",
+                "name": "Mechanical Gaming Keyboard",
+                "category": "electronics",
+                "price_per_unit": 99.0,  # Hallucinated price! Real is 1499.0
+                "total_price": 99.0,
+                "in_stock": True,
+                "stock_available": 999,  # Hallucinated stock! Real is 20
+                "match_reasons": ["Hallucinated"],
+                "within_budget": True,
+            },
+            {
+                "product_id": "FAKE_NONEXISTENT_PROD",  # Unknown product
+                "name": "Magic Wand",
+                "category": "magic",
+                "price_per_unit": 10.0,
+                "total_price": 10.0,
+                "in_stock": True,
+                "stock_available": 10,
+                "match_reasons": ["Fake"],
+                "within_budget": True,
+            }
+        ],
+    }
+
+    with patch("app.merchant_agent.service.call_llm_merchant_reasoning", return_value=hallucinated_quote):
+        req = InquiryRequest(query="i want keyboard")
+        res = merchant_agent_service.process_inquiry(req)
+
+    assert res.best_match_product_id == "KB001"
+    assert len(res.quotes) == 1
+    from app.catalog.service import get_product
+    real_stock = get_product("KB001").stock
+    assert res.quotes[0].stock_available == real_stock
+
+
+
+def test_merchant_agent_recommend_addons():
+    """
+    Track 01 Revenue Growth: verifies add-on cross-sell suggestions.
+    """
+    res = merchant_agent_service.recommend_addons(product_id="KB001", remaining_budget=500.0)
+    assert res.base_product_id == "KB001"
+    assert len(res.addons) > 0
+    for addon in res.addons:
+        assert addon.price_per_unit <= 500.0
+
+
 

@@ -22,6 +22,7 @@ from app.catalog.router import router as catalog_router
 from app.mcp.server import mount_remote_mcp, remote_mcp_lifespan
 from app.merchant_agent import merchant_agent_router
 from app.oauth.router import router as oauth_router
+from app.payment.router import router as payment_router
 
 app = FastAPI(
     title="Agentic Commerce Gateway",
@@ -42,6 +43,7 @@ app.include_router(audit_router)
 app.include_router(admin_router)
 app.include_router(oauth_router)
 app.include_router(merchant_agent_router)
+app.include_router(payment_router)
 
 # Mount remote Streamable HTTP MCP server at /mcp
 mount_remote_mcp(app, path="/mcp")

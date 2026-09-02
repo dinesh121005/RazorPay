@@ -2,6 +2,16 @@
  * Agentic Commerce Gateway — Admin Dashboard JavaScript Controller
  */
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 class AdminDashboard {
   constructor() {
     this.adminKey = localStorage.getItem("admin_api_key") || "dev-admin-secret-key";
@@ -331,31 +341,32 @@ class AdminDashboard {
       this.recentTbody.innerHTML = recent
         .map((r) => {
           const product = (this.products || []).find((p) => p.id === r.product_id);
-          const pName = product ? product.name : (r.product_id || "Unknown");
-          const refCode = r.transaction_id ? `REF-${r.transaction_id.slice(-8).toUpperCase()}` : "—";
+          const pName = escapeHtml(product ? product.name : (r.product_id || "Unknown"));
+          const refCode = r.transaction_id ? `REF-${escapeHtml(r.transaction_id.slice(-8).toUpperCase())}` : "—";
           const decBadge =
             r.decision === "APPROVED"
               ? `<span class="badge badge-success">APPROVED</span>`
               : `<span class="badge badge-danger">REJECTED</span>`;
-          const payBadge = r.payment_status === "created"
-            ? `<span class="badge badge-success">created</span>`
+          const payBadge = r.payment_status === "created" || r.payment_status === "captured"
+            ? `<span class="badge badge-success">${escapeHtml(r.payment_status)}</span>`
             : r.payment_status === "failed"
             ? `<span class="badge badge-danger">failed</span>`
-            : `<span class="badge badge-neutral">${r.payment_status || "none"}</span>`;
+            : `<span class="badge badge-neutral">${escapeHtml(r.payment_status || "none")}</span>`;
           const amountDisplay = (Number(r.amount) || 0).toFixed(2);
-          const timeDisplay = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : "—";
+          const timeDisplay = r.timestamp ? escapeHtml(new Date(r.timestamp).toLocaleTimeString()) : "—";
+          const safeCustId = escapeHtml(r.customer_id || "—");
 
           return `
             <tr>
               <td class="mono text-xs">${timeDisplay}</td>
               <td class="mono text-xs font-semibold">${refCode}</td>
-              <td><span class="mono text-xs">${r.customer_id || "—"}</span></td>
+              <td><span class="mono text-xs">${safeCustId}</span></td>
               <td>${pName}</td>
               <td class="mono font-semibold">₹${amountDisplay}</td>
               <td>${decBadge}</td>
               <td>${payBadge}</td>
               <td>
-                <button class="btn btn-ghost btn-sm" onclick="dashboard.showTxDetail('${r.transaction_id}')">Inspect</button>
+                <button class="btn btn-ghost btn-sm" onclick="dashboard.showTxDetail('${escapeHtml(r.transaction_id)}')">Inspect</button>
               </td>
             </tr>
           `;
@@ -391,28 +402,29 @@ class AdminDashboard {
     this.auditTbody.innerHTML = filtered
       .map((r) => {
         const product = (this.products || []).find((p) => p.id === r.product_id);
-        const pName = product ? product.name : (r.product_id || "—");
-        const refCode = r.transaction_id ? `REF-${r.transaction_id.slice(-8).toUpperCase()}` : "—";
+        const pName = escapeHtml(product ? product.name : (r.product_id || "—"));
+        const refCode = r.transaction_id ? `REF-${escapeHtml(r.transaction_id.slice(-8).toUpperCase())}` : "—";
         const decBadge =
           r.decision === "APPROVED"
             ? `<span class="badge badge-success">APPROVED</span>`
             : `<span class="badge badge-danger">REJECTED</span>`;
-        const rzpId = r.razorpay_order_id ? `<span class="mono text-xs">${r.razorpay_order_id}</span>` : `<span class="text-muted text-xs">—</span>`;
-        const timeStr = r.timestamp ? new Date(r.timestamp).toISOString().replace("T", " ").slice(0, 19) : "—";
+        const rzpId = r.razorpay_order_id ? `<span class="mono text-xs">${escapeHtml(r.razorpay_order_id)}</span>` : `<span class="text-muted text-xs">—</span>`;
+        const timeStr = r.timestamp ? escapeHtml(new Date(r.timestamp).toISOString().replace("T", " ").slice(0, 19)) : "—";
         const amountDisplay = (Number(r.amount) || 0).toFixed(2);
+        const safeCustId = escapeHtml(r.customer_id || "—");
 
         return `
           <tr>
             <td class="mono text-xs">${timeStr}</td>
             <td class="mono text-xs font-semibold">${refCode}</td>
-            <td><span class="mono text-xs">${r.customer_id || "—"}</span></td>
+            <td><span class="mono text-xs">${safeCustId}</span></td>
             <td>${pName}</td>
-            <td>${r.quantity || 1}</td>
+            <td>${escapeHtml(r.quantity || 1)}</td>
             <td class="mono font-semibold">₹${amountDisplay}</td>
             <td>${decBadge}</td>
             <td>${rzpId}</td>
             <td>
-              <button class="btn btn-secondary btn-sm" onclick="dashboard.showTxDetail('${r.transaction_id}')">View</button>
+              <button class="btn btn-secondary btn-sm" onclick="dashboard.showTxDetail('${escapeHtml(r.transaction_id)}')">View</button>
             </td>
           </tr>
         `;
@@ -430,26 +442,29 @@ class AdminDashboard {
     this.mandatesTbody.innerHTML = this.mandates
       .map((m) => {
         const cats = Array.isArray(m.allowed_categories)
-          ? m.allowed_categories.map((c) => `<span class="badge badge-neutral">${c}</span>`).join(" ")
+          ? m.allowed_categories.map((c) => `<span class="badge badge-neutral">${escapeHtml(c)}</span>`).join(" ")
           : "—";
         const merches = Array.isArray(m.allowed_merchants)
-          ? m.allowed_merchants.map((mech) => `<span class="mono text-xs">${mech}</span>`).join(", ")
+          ? m.allowed_merchants.map((mech) => `<span class="mono text-xs">${escapeHtml(mech)}</span>`).join(", ")
           : "—";
-        const exp = m.expires_at ? new Date(m.expires_at).toLocaleDateString() : "Never";
+        const exp = m.expires_at ? escapeHtml(new Date(m.expires_at).toLocaleDateString()) : "Never";
         const rawLimit = Number(m.max_transaction_amount ?? m.mandate_limit) || 0;
         const lim = rawLimit.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        const safeCustId = escapeHtml(m.customer_id);
+        const safeName = escapeHtml(m.display_name || "—");
+        const safeEmail = escapeHtml(m.email || "—");
 
         return `
           <tr>
-            <td class="mono font-semibold">${m.customer_id}</td>
-            <td class="font-semibold text-primary">${m.display_name || "—"}</td>
-            <td class="text-xs text-muted">${m.email || "—"}</td>
+            <td class="mono font-semibold">${safeCustId}</td>
+            <td class="font-semibold text-primary">${safeName}</td>
+            <td class="text-xs text-muted">${safeEmail}</td>
             <td class="mono font-bold text-success">₹${lim}</td>
             <td>${cats}</td>
             <td>${merches}</td>
             <td class="text-xs text-muted">${exp}</td>
             <td>
-              <button class="btn btn-secondary btn-sm" onclick="dashboard.openEditMandateModal('${m.customer_id}', '${m.display_name}', ${rawLimit})">
+              <button class="btn btn-secondary btn-sm" onclick="dashboard.openEditMandateModal('${safeCustId}', '${safeName}', ${rawLimit})">
                 Edit Limit
               </button>
             </td>
@@ -475,16 +490,20 @@ class AdminDashboard {
           : `<span class="badge badge-danger">Out of stock</span>`;
 
         const priceDisplay = (Number(p.price) || 0).toLocaleString("en-IN");
+        const safeId = escapeHtml(p.id);
+        const safeCat = escapeHtml(p.category);
+        const safeName = escapeHtml(p.name);
+        const safeDesc = escapeHtml(p.description || "No description provided.");
 
         return `
           <div class="product-card">
             <div>
               <div class="product-card-top">
-                <span class="product-id-tag">${p.id}</span>
-                <span class="badge badge-neutral">${p.category}</span>
+                <span class="product-id-tag">${safeId}</span>
+                <span class="badge badge-neutral">${safeCat}</span>
               </div>
-              <h4 class="product-name">${p.name}</h4>
-              <p class="product-desc">${p.description || "No description provided."}</p>
+              <h4 class="product-name">${safeName}</h4>
+              <p class="product-desc">${safeDesc}</p>
             </div>
             <div class="product-card-bottom">
               <span class="product-price">₹${priceDisplay}</span>
@@ -593,7 +612,7 @@ class AdminDashboard {
     this.sandboxConsole.innerHTML = `
       <div class="trace-step info">
         <div class="trace-step-header">🤖 Step 1: Buyer AI ➔ Merchant Sales AI</div>
-        <div>Inquiry: "${prompt}"</div>
+        <div>Inquiry: "${escapeHtml(prompt)}"</div>
         <div class="text-xs text-muted mt-2">Connecting to Google Gemini Merchant Agent...</div>
       </div>
     `;
@@ -616,20 +635,20 @@ class AdminDashboard {
         this.sandboxConsole.innerHTML = `
           <div class="trace-step info">
             <div class="trace-step-header">🤖 Step 1: Buyer AI ➔ Merchant Sales AI</div>
-            <div>Inquiry: "${prompt}"</div>
+            <div>Inquiry: "${escapeHtml(prompt)}"</div>
           </div>
           <div class="trace-step success">
             <div class="trace-step-header">🛍️ Step 2: Merchant Sales AI Quote (Gemini)</div>
-            <div class="text-primary font-bold">${data.merchant_notes}</div>
-            <div class="mt-2 text-xs">Top Match ID: <span class="mono">${data.best_match_product_id || "None"}</span></div>
-            <pre class="json-viewer mt-2">${JSON.stringify(data.quotes, null, 2)}</pre>
+            <div class="text-primary font-bold">${escapeHtml(data.merchant_notes)}</div>
+            <div class="mt-2 text-xs">Top Match ID: <span class="mono">${escapeHtml(data.best_match_product_id || "None")}</span></div>
+            <pre class="json-viewer mt-2">${escapeHtml(JSON.stringify(data.quotes, null, 2))}</pre>
           </div>
         `;
       }
     } catch (e) {
       this.sandboxStatusPill.className = "badge badge-danger";
       this.sandboxStatusPill.textContent = "Error";
-      this.sandboxConsole.innerHTML += `<div class="trace-step danger">Error invoking Merchant AI: ${e.message}</div>`;
+      this.sandboxConsole.innerHTML += `<div class="trace-step danger">Error invoking Merchant AI: ${escapeHtml(e.message)}</div>`;
     }
   }
 
@@ -648,7 +667,7 @@ class AdminDashboard {
     this.sandboxConsole.innerHTML = `
       <div class="trace-step info">
         <div class="trace-step-header">🚀 Initiating Autonomous Agent-to-Agent Flow</div>
-        <div>Customer: <span class="mono">${custId}</span> | Query: "${prompt}"</div>
+        <div>Customer: <span class="mono">${escapeHtml(custId)}</span> | Query: "${escapeHtml(prompt)}"</div>
       </div>
     `;
 
@@ -662,10 +681,13 @@ class AdminDashboard {
       const inqData = await inqRes.json();
       const productId = inqData.best_match_product_id || "KB001";
 
-      // Step 2: Propose Purchase
+      // Step 2: Propose Purchase (Authenticated via Admin Key)
       const purRes = await fetch("/agent/purchase", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-API-Key": this.adminKey,
+        },
         body: JSON.stringify({
           customer_id: custId,
           product_id: productId,
@@ -675,38 +697,142 @@ class AdminDashboard {
       });
       const purData = await purRes.json();
 
-      const isApproved = purData.decision === "APPROVED";
-      this.sandboxStatusPill.className = isApproved ? "badge badge-success" : "badge badge-danger";
-      this.sandboxStatusPill.textContent = isApproved ? "Purchase Approved" : "Policy Rejected";
+      const isGated = purData.requires_confirmation;
 
-      const refCode = purData.decision === "APPROVED" ? `REF-${purData.transaction_id.slice(-8).toUpperCase()}` : "N/A";
-      const rzpOrderId = purData.razorpay_order_id ? `<span class="mono">${purData.razorpay_order_id}</span>` : "None (Policy Rejected)";
+      if (isGated && purData.confirmation_token) {
+        this.sandboxStatusPill.className = "badge badge-warning";
+        this.sandboxStatusPill.textContent = "Awaiting Human Approval";
+        this.sandboxConsole.innerHTML = `
+          <div class="trace-step info">
+            <div class="trace-step-header">🤖 Step 1: Merchant AI Quote</div>
+            <div>Matched Product: <span class="mono font-bold">${escapeHtml(productId)}</span></div>
+            <div class="text-xs text-muted">${escapeHtml(inqData.merchant_notes)}</div>
+          </div>
+          <div class="trace-step warning">
+            <div class="trace-step-header">🛡️ Step 2: Policy Mandate Evaluation (Gated: >= ₹500)</div>
+            <div class="font-bold text-warning">Status: ${escapeHtml(purData.decision)}</div>
+            <div class="text-sm mt-1">${escapeHtml(purData.reason)}</div>
+            <div class="mt-2 text-xs text-muted">Confirmation Token Minted: <span class="mono">${escapeHtml(purData.confirmation_token.slice(0, 28))}...</span></div>
+          </div>
+          <div class="trace-step" style="border: 2px solid #f59e0b; background: rgba(245, 158, 11, 0.08); border-radius: 8px; padding: 16px;">
+            <div class="trace-step-header" style="font-size: 14px; font-weight: 700; color: #f59e0b;">
+              👤 Human Approval Challenge
+            </div>
+            <div class="text-sm mt-1">
+              Safety Gating Rule: Purchases <strong>≥ ₹500.00</strong> require explicit human authorization before funds movement.
+            </div>
+            <div class="mt-3 p-3" style="background: rgba(0,0,0,0.25); border-radius: 6px; font-size: 13px;">
+              <div><strong>Product:</strong> ${escapeHtml(productId)} (Quantity: ${qty})</div>
+              <div><strong>Total Transaction Value:</strong> <span class="mono font-bold" style="color: #10b981;">₹${(Number(purData.amount) || 0).toFixed(2)}</span></div>
+              <div><strong>Mandate Limit:</strong> ₹${(Number(purData.mandate_limit) || 0).toFixed(2)}</div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 16px;">
+              <button id="sandbox-btn-approve" class="btn btn-primary" style="flex: 1; background: #10b981; border: none; font-weight: 600; padding: 10px;">
+                ✅ Approve & Mint Razorpay Order
+              </button>
+              <button id="sandbox-btn-reject" class="btn btn-secondary" style="flex: 1; background: #ef4444; border: none; color: white; font-weight: 600; padding: 10px;">
+                ❌ Reject Proposal
+              </button>
+            </div>
+          </div>
+        `;
 
-      this.sandboxConsole.innerHTML = `
-        <div class="trace-step info">
-          <div class="trace-step-header">🤖 Step 1: Merchant AI Quote</div>
-          <div>Matched Product: <span class="mono font-bold">${productId}</span></div>
-          <div class="text-xs text-muted">${inqData.merchant_notes}</div>
-        </div>
-        <div class="trace-step ${isApproved ? "success" : "danger"}">
-          <div class="trace-step-header">🛡️ Step 2: Policy Engine Evaluation</div>
-          <div class="font-bold">Verdict: ${purData.decision}</div>
-          <div>Reason: ${purData.reason}</div>
-          <div class="mt-2 text-xs">Total Amount: <span class="mono font-bold">₹${(Number(purData.amount) || 0).toFixed(2)}</span></div>
-          <div class="text-xs">Razorpay Order ID: ${rzpOrderId}</div>
-          <div class="text-xs">Human Reference Code: <span class="mono font-bold">${refCode}</span></div>
-        </div>
-      `;
+        // Attach Interactive Click Handlers for Human in the Loop
+        document.getElementById("sandbox-btn-approve").addEventListener("click", async () => {
+          await this.executeHumanConfirmation(purData.confirmation_token, productId, inqData, purData.amount);
+        });
 
-      // Refresh tables
-      await this.fetchAllData();
-      this.showToast(`Sandbox run completed: ${purData.decision}`, isApproved ? "success" : "error");
+        document.getElementById("sandbox-btn-reject").addEventListener("click", () => {
+          this.executeHumanRejection(productId, inqData, purData.amount);
+        });
+
+        await this.fetchAllData();
+        return;
+      }
+
+      // Non-gated flow (< ₹500 micro-purchases or direct rejections)
+      this.renderPurchaseCompletion(purData, productId, inqData);
     } catch (e) {
       this.sandboxStatusPill.className = "badge badge-danger";
       this.sandboxStatusPill.textContent = "Execution Failed";
-      this.sandboxConsole.innerHTML += `<div class="trace-step danger">Execution Error: ${e.message}</div>`;
+      this.sandboxConsole.innerHTML += `<div class="trace-step danger">Execution Error: ${escapeHtml(e.message)}</div>`;
     }
   }
+
+  async executeHumanConfirmation(token, productId, inqData, amount) {
+    this.sandboxStatusPill.className = "badge badge-warning";
+    this.sandboxStatusPill.textContent = "Processing Payment Rails...";
+    try {
+      const confRes = await fetch("/agent/confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-API-Key": this.adminKey,
+        },
+        body: JSON.stringify({ confirmation_token: token }),
+      });
+      const confData = await confRes.json();
+      this.renderPurchaseCompletion(confData, productId, inqData, true);
+    } catch (err) {
+      this.sandboxStatusPill.className = "badge badge-danger";
+      this.sandboxStatusPill.textContent = "Confirmation Failed";
+      this.showToast(`Confirmation failed: ${err.message}`, "error");
+    }
+  }
+
+  executeHumanRejection(productId, inqData, amount) {
+    this.sandboxStatusPill.className = "badge badge-danger";
+    this.sandboxStatusPill.textContent = "Rejected by Human";
+    this.sandboxConsole.innerHTML = `
+      <div class="trace-step info">
+        <div class="trace-step-header">🤖 Step 1: Merchant AI Quote</div>
+        <div>Matched Product: <span class="mono font-bold">${escapeHtml(productId)}</span></div>
+        <div class="text-xs text-muted">${escapeHtml(inqData.merchant_notes)}</div>
+      </div>
+      <div class="trace-step danger">
+        <div class="trace-step-header">❌ Human Decision</div>
+        <div class="font-bold">Proposal explicitly rejected by customer.</div>
+        <div class="text-xs mt-1">Payment rails halted. No Razorpay order minted. Zero funds spent.</div>
+      </div>
+    `;
+    this.showToast("Proposal was cancelled by human operator", "info");
+  }
+
+  renderPurchaseCompletion(purData, productId, inqData, humanConfirmed = false) {
+    const isApproved = purData.decision === "APPROVED";
+    this.sandboxStatusPill.className = isApproved ? "badge badge-success" : "badge badge-danger";
+    this.sandboxStatusPill.textContent = isApproved ? "Purchase Approved" : "Policy Rejected";
+
+    const refCode = isApproved ? `REF-${purData.transaction_id.slice(-8).toUpperCase()}` : "N/A";
+    const rzpOrderId = purData.payment && purData.payment.razorpay_order_id
+      ? `<span class="mono font-bold text-success">${escapeHtml(purData.payment.razorpay_order_id)}</span>`
+      : "None (Policy Rejected)";
+
+    const humanTag = humanConfirmed
+      ? `<div class="badge badge-success mb-2">✓ Verified via Human Confirmation Challenge</div>`
+      : "";
+
+    this.sandboxConsole.innerHTML = `
+      <div class="trace-step info">
+        <div class="trace-step-header">🤖 Step 1: Merchant AI Quote</div>
+        <div>Matched Product: <span class="mono font-bold">${escapeHtml(productId)}</span></div>
+        <div class="text-xs text-muted">${escapeHtml(inqData.merchant_notes)}</div>
+      </div>
+      <div class="trace-step ${isApproved ? "success" : "danger"}">
+        ${humanTag}
+        <div class="trace-step-header">🛡️ Step 2: Policy & Payment Rails Outcome</div>
+        <div class="font-bold">Verdict: ${escapeHtml(purData.decision)}</div>
+        <div>Reason: ${escapeHtml(purData.reason)}</div>
+        <div class="mt-2 text-xs">Total Amount: <span class="mono font-bold">₹${(Number(purData.amount) || 0).toFixed(2)}</span></div>
+        <div class="text-xs">Razorpay Order ID: ${rzpOrderId}</div>
+        <div class="text-xs">Human Reference Code: <span class="mono font-bold">${escapeHtml(refCode)}</span></div>
+      </div>
+    `;
+
+    this.fetchAllData();
+    this.showToast(`Sandbox run completed: ${purData.decision}`, isApproved ? "success" : "error");
+  }
+
 
   showToast(message, type = "info") {
     const container = document.getElementById("toast-container");

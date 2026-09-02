@@ -86,6 +86,7 @@ class MandateStore:
                     display_name TEXT NOT NULL,
                     email TEXT,
                     max_transaction_amount REAL NOT NULL,
+                    daily_limit REAL NOT NULL DEFAULT 5000.0,
                     currency TEXT NOT NULL DEFAULT 'INR',
                     allowed_categories TEXT NOT NULL,
                     allowed_merchants TEXT NOT NULL,
@@ -96,6 +97,12 @@ class MandateStore:
                 )
                 """
             )
+            try:
+                cursor.execute("ALTER TABLE customer_mandates ADD COLUMN daily_limit REAL DEFAULT 5000.0")
+                conn.commit()
+            except Exception:
+                pass
+
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_mandates_email ON customer_mandates (email)"
             )
@@ -113,15 +120,16 @@ class MandateStore:
                         """
                         INSERT INTO customer_mandates (
                             customer_id, display_name, email, max_transaction_amount,
-                            currency, allowed_categories, allowed_merchants,
+                            daily_limit, currency, allowed_categories, allowed_merchants,
                             expires_at, prompt_playback, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             m.customer_id,
                             m.display_name,
                             m.email,
                             m.max_transaction_amount,
+                            m.daily_limit or 5000.0,
                             m.currency,
                             json.dumps(m.allowed_categories),
                             json.dumps(m.allowed_merchants),
@@ -135,19 +143,36 @@ class MandateStore:
 
     def _row_to_mandate(self, row: tuple) -> Mandate:
         """Convert a database row into a Pydantic Mandate instance."""
-        (
-            customer_id,
-            display_name,
-            email,
-            max_amount,
-            currency,
-            cats_json,
-            merchs_json,
-            exp_str,
-            playback,
-            _,
-            _,
-        ) = row
+        if len(row) == 12:
+            (
+                customer_id,
+                display_name,
+                email,
+                max_amount,
+                daily_limit,
+                currency,
+                cats_json,
+                merchs_json,
+                exp_str,
+                playback,
+                _,
+                _,
+            ) = row
+        else:
+            (
+                customer_id,
+                display_name,
+                email,
+                max_amount,
+                currency,
+                cats_json,
+                merchs_json,
+                exp_str,
+                playback,
+                _,
+                _,
+            ) = row
+            daily_limit = 5000.0
 
         cats = json.loads(cats_json) if isinstance(cats_json, str) else list(cats_json)
         merchs = json.loads(merchs_json) if isinstance(merchs_json, str) else list(merchs_json)
@@ -158,12 +183,14 @@ class MandateStore:
             display_name=display_name,
             email=email,
             max_transaction_amount=float(max_amount),
+            daily_limit=float(daily_limit) if daily_limit is not None else 5000.0,
             currency=currency or "INR",
             allowed_categories=cats,
             allowed_merchants=merchs,
             expires_at=exp_dt,
             prompt_playback=playback,
         )
+
 
     def get_mandate(self, customer_id: str) -> Optional[Mandate]:
         """
@@ -248,13 +275,14 @@ class MandateStore:
                 """
                 INSERT INTO customer_mandates (
                     customer_id, display_name, email, max_transaction_amount,
-                    currency, allowed_categories, allowed_merchants,
+                    daily_limit, currency, allowed_categories, allowed_merchants,
                     expires_at, prompt_playback, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(customer_id) DO UPDATE SET
                     display_name = excluded.display_name,
                     email = excluded.email,
                     max_transaction_amount = excluded.max_transaction_amount,
+                    daily_limit = excluded.daily_limit,
                     currency = excluded.currency,
                     allowed_categories = excluded.allowed_categories,
                     allowed_merchants = excluded.allowed_merchants,
@@ -267,6 +295,7 @@ class MandateStore:
                     mandate.display_name,
                     mandate.email,
                     mandate.max_transaction_amount,
+                    mandate.daily_limit if mandate.daily_limit is not None else 5000.0,
                     mandate.currency,
                     json.dumps(mandate.allowed_categories),
                     json.dumps(mandate.allowed_merchants),
@@ -286,6 +315,7 @@ class MandateStore:
         allowed_merchants: List[str],
         display_name: str = "Demo Customer",
         email: Optional[str] = None,
+        daily_limit: Optional[float] = 5000.0,
         expires_at: Optional[datetime] = None,
     ) -> Mandate:
         """Creates and stores a new customer mandate in SQLite."""
@@ -297,14 +327,15 @@ class MandateStore:
         cats_str = ", ".join(allowed_categories)
         merchs_str = ", ".join(allowed_merchants)
         playback = (
-            f"Pre-authorized spending up to ₹{mandate_limit:,.0f} for {cats_str} "
-            f"from verified demo merchants ({merchs_str})."
+            f"Pre-authorized spending up to ₹{mandate_limit:,.0f} per transaction (₹{daily_limit:,.0f} daily) "
+            f"for {cats_str} from verified demo merchants ({merchs_str})."
         )
         mandate = Mandate(
             customer_id=customer_id,
             display_name=display_name,
             email=email,
             max_transaction_amount=mandate_limit,
+            daily_limit=daily_limit,
             currency="INR",
             allowed_categories=allowed_categories,
             allowed_merchants=allowed_merchants,

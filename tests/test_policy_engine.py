@@ -447,3 +447,40 @@ def test_mandate_store_save_mandate():
     assert retrieved.customer_id == "CUST_CUSTOM"
     assert retrieved.max_transaction_amount == 3000.0
 
+
+def test_policy_engine_daily_limit_approved_within_bounds(demo_mandate):
+    """Cumulative daily spend + current amount <= daily_limit -> APPROVED."""
+    demo_mandate.daily_limit = 5000.0
+    req = PurchaseRequest(
+        customer_id="CUST001",
+        product_id="KB001",
+        category="electronics",
+        amount=1499.0,
+        merchant="MERCH_ELEC",
+        quantity=1,
+    )
+    # Already spent 2000.0 today: 2000 + 1499 = 3499 <= 5000 -> APPROVED
+    decision = evaluate(req, demo_mandate, current_daily_spend=2000.0)
+    assert decision.status == "APPROVED"
+    assert decision.rule_violated is None
+
+
+def test_policy_engine_daily_limit_rejected_exceeded(demo_mandate):
+    """Cumulative daily spend + current amount > daily_limit -> REJECTED (DAILY_LIMIT_EXCEEDED)."""
+    demo_mandate.daily_limit = 3000.0
+    req = PurchaseRequest(
+        customer_id="CUST001",
+        product_id="KB001",
+        category="electronics",
+        amount=1499.0,
+        merchant="MERCH_ELEC",
+        quantity=1,
+    )
+    # Already spent 2000.0 today: 2000 + 1499 = 3499 > 3000 -> REJECTED
+    decision = evaluate(req, demo_mandate, current_daily_spend=2000.0)
+    assert decision.status == "REJECTED"
+    assert decision.rule_violated == RuleViolated.DAILY_LIMIT_EXCEEDED
+    assert "daily mandate cap" in decision.reason
+
+
+

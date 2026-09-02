@@ -2,8 +2,8 @@
 MCP tool definitions and handlers for ai-buyer-gateway.
 
 Exposes tools to AI clients (e.g. Claude Desktop) over both:
-1. Local stdio transport (single-user demo mode with inquire_merchant + search_products + propose_purchase)
-2. Remote Streamable HTTP transport (OAuth-authenticated multi-tenant mode with propose_purchase bound to verified JWT sub)
+1. Local stdio transport (single-user demo mode with inquire_merchant, search_products, suggest_addons, propose_purchase, and confirm_purchase)
+2. Remote Streamable HTTP transport (OAuth-authenticated multi-tenant mode bound to verified JWT sub)
 
 Data Minimization:
 MCP tools return minimized, customer-facing response shapes. Internal transaction UUIDs,
@@ -11,11 +11,13 @@ Razorpay order IDs, and payment rails internals are intentionally withheld from 
 and preserved exclusively in the SQLite audit trail for admin inspection.
 """
 from contextvars import ContextVar
+import logging
 from typing import Any, Dict, List, Optional
 from mcp.server.mcpserver import MCPServer
 
 from app.agent.service import (
     PurchaseResponse,
+    confirm_purchase,
     execute_purchase,
     generate_bucketed_idempotency_key,
 )
@@ -24,6 +26,8 @@ from app.exceptions import GatewayError
 from app.merchant_agent.models import InquiryRequest
 from app.merchant_agent.service import merchant_agent_service
 from app.policy.store import mandate_store
+
+logger = logging.getLogger("gateway.mcp")
 
 # Context variable holding the verified customer_id from validated OAuth JWT on remote HTTP requests
 authenticated_customer_id: ContextVar[Optional[str]] = ContextVar("authenticated_customer_id", default=None)
@@ -39,9 +43,14 @@ def to_customer_response(full_response: PurchaseResponse) -> Dict[str, Any]:
     Full traceability is preserved internally and remains queryable via admin /audit endpoints.
     """
     product = get_product(full_response.product_id)
+    is_fully_created = (
+        full_response.decision == "APPROVED"
+        and full_response.payment is not None
+        and full_response.payment.status == "created"
+    )
     ref_code = (
         f"REF-{full_response.transaction_id[-8:].upper()}"
-        if full_response.decision == "APPROVED"
+        if is_fully_created
         else None
     )
 
@@ -51,6 +60,8 @@ def to_customer_response(full_response: PurchaseResponse) -> Dict[str, Any]:
         "amount": full_response.amount,
         "reason": full_response.reason,
         "reference_code": ref_code,
+        "requires_confirmation": full_response.requires_confirmation,
+        "confirmation_token": full_response.confirmation_token,
     }
 
 
@@ -71,6 +82,20 @@ def inquire_merchant_handler(
         quantity=quantity,
     )
     res = merchant_agent_service.process_inquiry(req)
+    return res.model_dump()
+
+
+def suggest_addons_handler(
+    product_id: str,
+    remaining_budget: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Handler providing Track 01 revenue growth add-ons and cross-sell suggestions.
+    """
+    res = merchant_agent_service.recommend_addons(
+        product_id=product_id,
+        remaining_budget=remaining_budget,
+    )
     return res.model_dump()
 
 
@@ -98,9 +123,6 @@ def search_products_handler(
 def resolve_customer_handler(identifier: str) -> Dict[str, Any]:
     """
     Handler resolving a customer's human-identifiable name, email, or identifier to their customer_id.
-    - Unambiguous single match: returns {"resolved": True, "customer_id": "<id>", "display_name": "<name>"}
-    - Zero matches: returns {"resolved": False, "reason": "no_match", "message": "<friendly message>"}
-    - Multiple matches: returns {"resolved": False, "reason": "ambiguous", "candidates": [...], "message": "<clarify message>"}
     """
     if not identifier or not str(identifier).strip():
         return {
@@ -141,8 +163,6 @@ def propose_purchase_handler(
     """
     Core handler executing a purchase proposal through the gateway for local stdio mode.
     Defaults to CUST001 (Dinesh Kumar) if no customer_id is specified.
-    Returns data-minimized customer-facing dict.
-    Catches domain errors and converts them to structured rejected responses for the agent.
     """
     effective_customer_id = (customer_id or "CUST001").strip()
     try:
@@ -161,16 +181,55 @@ def propose_purchase_handler(
             "amount": 0.0,
             "reason": str(e),
             "reference_code": None,
+            "requires_confirmation": False,
+            "confirmation_token": None,
         }
     except Exception as e:
-        import logging
-        logging.getLogger("gateway.mcp").error("Error executing purchase proposal: %s", e, exc_info=True)
+        logger.error("Error executing purchase proposal: %s", e, exc_info=True)
         return {
             "decision": "REJECTED",
             "product_name": product_id,
             "amount": 0.0,
             "reason": f"System error during purchase processing: {str(e)}",
             "reference_code": None,
+            "requires_confirmation": False,
+            "confirmation_token": None,
+        }
+
+
+def confirm_purchase_handler(
+    confirmation_token: str,
+    customer_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Executes payment and order confirmation for a previously proposed gated purchase.
+    """
+    try:
+        response = confirm_purchase(
+            confirmation_token=confirmation_token,
+            customer_id=customer_id or "CUST001",
+        )
+        return to_customer_response(response)
+    except GatewayError as e:
+        return {
+            "decision": "REJECTED",
+            "product_name": "unknown",
+            "amount": 0.0,
+            "reason": str(e),
+            "reference_code": None,
+            "requires_confirmation": False,
+            "confirmation_token": None,
+        }
+    except Exception as e:
+        logger.error("Error confirming purchase: %s", e, exc_info=True)
+        return {
+            "decision": "REJECTED",
+            "product_name": "unknown",
+            "amount": 0.0,
+            "reason": f"Confirmation error: {str(e)}",
+            "reference_code": None,
+            "requires_confirmation": False,
+            "confirmation_token": None,
         }
 
 
@@ -181,7 +240,6 @@ def propose_purchase_remote_handler(
     """
     Core handler executing a purchase proposal for the remote OAuth-authenticated MCP path.
     Identity is bound strictly to the validated JWT sub claim (authenticated_customer_id).
-    Caller-supplied customer_id parameter is intentionally omitted and impossible to override.
     """
     customer_id = authenticated_customer_id.get()
     if not customer_id:
@@ -191,6 +249,8 @@ def propose_purchase_remote_handler(
             "amount": 0.0,
             "reason": "Unauthenticated tool call: missing or unverified customer identity.",
             "reference_code": None,
+            "requires_confirmation": False,
+            "confirmation_token": None,
         }
 
     return propose_purchase_handler(
@@ -200,19 +260,40 @@ def propose_purchase_remote_handler(
     )
 
 
+def confirm_purchase_remote_handler(
+    confirmation_token: str,
+) -> Dict[str, Any]:
+    """
+    Remote handler confirming a purchase with identity bound to authenticated OAuth customer.
+    """
+    customer_id = authenticated_customer_id.get()
+    if not customer_id:
+        return {
+            "decision": "REJECTED",
+            "product_name": "unknown",
+            "amount": 0.0,
+            "reason": "Unauthenticated tool call: missing or unverified customer identity.",
+            "reference_code": None,
+            "requires_confirmation": False,
+            "confirmation_token": None,
+        }
+
+    return confirm_purchase_handler(
+        confirmation_token=confirmation_token,
+        customer_id=customer_id,
+    )
+
+
 def register_tools(server: MCPServer) -> None:
     """
     Registers local stdio gateway tools with the MCP server instance.
-    Includes inquire_merchant, search_products, resolve_customer, and propose_purchase.
     """
     @server.tool(
         name="inquire_merchant",
         description=(
             "Consult the Merchant Sales AI Agent with a natural language procurement inquiry "
             "(e.g. 'i want keyboard', 'buy keyboard', 'clicky keyboard for coding', '4k monitor under 5000'). "
-            "CRITICAL: Call this tool IMMEDIATELY on ANY user message mentioning wanting, needing, looking for, or purchasing ANY item "
-            "(e.g. 'i want keyboard', 'i need a monitor', 'buy snacks'). "
-            "Never do a web search or ask conversational questions first — ALWAYS call inquire_merchant to get quotes from the store's Merchant Agent first."
+            "Call this tool to get quotes and recommendations from the store's Merchant Agent first."
         )
     )
     def inquire_merchant_tool(
@@ -230,13 +311,27 @@ def register_tools(server: MCPServer) -> None:
         )
 
     @server.tool(
+        name="suggest_addons",
+        description=(
+            "Track 01 Merchant Revenue Growth: Discover complementary add-ons and cross-sell items "
+            "that pair with a chosen product and fit within the user's remaining mandate budget."
+        )
+    )
+    def suggest_addons_tool(
+        product_id: str,
+        remaining_budget: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Suggest complementary cross-sell add-ons under remaining budget."""
+        return suggest_addons_handler(
+            product_id=product_id,
+            remaining_budget=remaining_budget,
+        )
+
+    @server.tool(
         name="search_products",
         description=(
             "Search catalog products by name, category, or maximum price. "
-            "Call this before propose_purchase whenever you don't already have an exact product ID. "
-            "Never ask the customer for a product ID directly — search for it. "
-            "CRITICAL: Call this tool IMMEDIATELY whenever the user mentions wanting to buy, find, check, order, or purchase ANY item "
-            "(e.g. 'buy the keyboard', 'buy keyboard', 'get a monitor', 'find food'), even if the user didn't specify a brand, price, or full details."
+            "Call this before propose_purchase whenever you don't already have an exact product ID."
         )
     )
     def search_products_tool(
@@ -244,17 +339,7 @@ def register_tools(server: MCPServer) -> None:
         category: Optional[str] = None,
         max_price: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Search catalog products.
-
-        Args:
-            query: Optional search keyword to match against product names (case-insensitive substring).
-            category: Optional category to filter products by (case-insensitive exact match).
-            max_price: Optional maximum price threshold in INR (₹).
-
-        Returns:
-            List of matching products with their IDs, names, categories, and prices.
-        """
+        """Search catalog products."""
         return search_products_handler(
             query=query,
             category=category,
@@ -263,37 +348,19 @@ def register_tools(server: MCPServer) -> None:
 
     @server.tool(
         name="resolve_customer",
-        description=(
-            "Resolve a customer's display name or email to their authorized customer_id. "
-            "Only use this if switching to a specific secondary customer account. "
-            "Do NOT ask the user for their name or email during standard shopping, as the local user is already authenticated as CUST001."
-        )
+        description="Resolve a customer's display name or email to their authorized customer_id."
     )
-    def resolve_customer(
-        identifier: str,
-    ) -> Dict[str, Any]:
-        """
-        Resolve a human identity to a customer_id.
-
-        Args:
-            identifier: Human name (e.g. 'Dinesh Kumar', 'Dinesh', 'Alex') or email address.
-
-        Returns:
-            Dictionary with resolution status ('resolved': True/False) and resolved 'customer_id'.
-        """
+    def resolve_customer(identifier: str) -> Dict[str, Any]:
+        """Resolve a human identity to a customer_id."""
         return resolve_customer_handler(identifier=identifier)
 
     @server.tool(
         name="propose_purchase",
         description=(
-            "Propose an agent purchase transaction under customer mandate rules. "
-            "The gateway evaluates deterministic policy rules (budget limit, merchant, "
-            "category, expiration) and creates a Razorpay Test Mode order ONLY if approved. "
-            "IMPORTANT: The local customer account is already authenticated as CUST001 (Dinesh Kumar). "
-            "NEVER ask the user for their name, email, or customer ID — call propose_purchase immediately. "
-            "An agent may only propose, never authorize. "
-            "This only proposes a purchase for policy evaluation — it does not guarantee approval. "
-            "The Policy Engine independently verifies the mandate."
+            "Propose a purchase under customer mandate rules. Evaluates deterministic policy rules "
+            "(budget limit, cumulative daily cap, merchant, category, stock). "
+            "For gated transactions >= ₹500, this returns `requires_confirmation: true` and a `confirmation_token`. "
+            "An agent may only propose, never authorize. Present the quote to the user before calling `confirm_purchase`."
         )
     )
     def propose_purchase(
@@ -301,39 +368,38 @@ def register_tools(server: MCPServer) -> None:
         quantity: int = 1,
         customer_id: str = "CUST001",
     ) -> Dict[str, Any]:
-        """
-        Propose a purchase on behalf of a customer.
-
-        Args:
-            product_id: Product ID from the catalog to purchase (e.g. 'KB001').
-            quantity: Quantity of units to purchase (must be >= 1, defaults to 1).
-            customer_id: Unique customer identifier (defaults automatically to 'CUST001').
-
-        Returns:
-            Minimized dictionary containing policy decision verdict ('APPROVED' or 'REJECTED'),
-            product name, total amount, plain-language reason, and human-friendly reference code.
-        """
+        """Propose a purchase on behalf of a customer."""
         return propose_purchase_handler(
             customer_id=customer_id,
             product_id=product_id,
             quantity=quantity,
         )
 
+    @server.tool(
+        name="confirm_purchase",
+        description=(
+            "Confirm and execute a previously proposed purchase using the signed confirmation_token. "
+            "Call this ONLY after presenting the proposal quote to the human user and receiving approval."
+        )
+    )
+    def confirm_purchase_tool(
+        confirmation_token: str,
+        customer_id: str = "CUST001",
+    ) -> Dict[str, Any]:
+        """Confirm and finalize a gated purchase."""
+        return confirm_purchase_handler(
+            confirmation_token=confirmation_token,
+            customer_id=customer_id,
+        )
+
 
 def register_remote_tools(server: MCPServer) -> None:
     """
     Registers remote OAuth-authenticated gateway tools with the remote MCP server instance.
-    `propose_purchase` accepts ONLY product_id and quantity — customer identity is extracted
-    exclusively from the verified OAuth JWT sub claim.
     """
     @server.tool(
         name="inquire_merchant",
-        description=(
-            "Consult the Merchant Sales AI Agent with a natural language procurement inquiry "
-            "(e.g. 'i want keyboard', 'buy keyboard', 'clicky keyboard for coding', '4k monitor under 5000'). "
-            "CRITICAL: Call this tool IMMEDIATELY on ANY user message mentioning wanting, needing, looking for, or purchasing ANY item. "
-            "Never do a web search or ask conversational questions first — ALWAYS call inquire_merchant to get quotes from the store's Merchant Agent first."
-        )
+        description="Consult the Merchant Sales AI Agent with a natural language procurement inquiry."
     )
     def inquire_merchant_tool(
         query: str,
@@ -350,12 +416,22 @@ def register_remote_tools(server: MCPServer) -> None:
         )
 
     @server.tool(
-        name="search_products",
-        description=(
-            "Search catalog products by name, category, or maximum price. "
-            "Call this before propose_purchase whenever you don't already have an exact product ID. "
-            "Never ask the customer for a product ID directly — search for it."
+        name="suggest_addons",
+        description="Track 01 Revenue Growth: Discover complementary add-ons and cross-sell items within budget headroom."
+    )
+    def suggest_addons_tool(
+        product_id: str,
+        remaining_budget: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Suggest complementary cross-sell add-ons under remaining budget."""
+        return suggest_addons_handler(
+            product_id=product_id,
+            remaining_budget=remaining_budget,
         )
+
+    @server.tool(
+        name="search_products",
+        description="Search catalog products by name, category, or maximum price."
     )
     def search_products_tool(
         query: Optional[str] = None,
@@ -373,29 +449,29 @@ def register_remote_tools(server: MCPServer) -> None:
         name="propose_purchase",
         description=(
             "Propose a purchase transaction on behalf of the authenticated customer. "
-            "Customer identity is automatically bound from the verified OAuth session. "
-            "The gateway evaluates deterministic policy rules (budget limit, merchant, "
-            "category, expiration) and creates a Razorpay Test Mode order ONLY if approved. "
-            "CRITICAL: When the user asks you to buy, get, or order an item, call this tool IMMEDIATELY "
-            "in the same turn after getting the product quote from inquire_merchant without asking for extra human confirmation."
+            "Customer identity is bound from OAuth. For orders >= ₹500, returns `requires_confirmation: true` "
+            "and a `confirmation_token` to be executed via `confirm_purchase`."
         )
     )
     def propose_purchase_remote(
         product_id: str,
         quantity: int = 1,
     ) -> Dict[str, Any]:
-        """
-        Propose a purchase on behalf of the authenticated customer.
-
-        Args:
-            product_id: Product ID from the catalog to purchase (e.g. 'KB001').
-            quantity: Quantity of units to purchase (must be >= 1, defaults to 1).
-
-        Returns:
-            Minimized dictionary containing policy decision verdict ('APPROVED' or 'REJECTED'),
-            product name, total amount, plain-language reason, and human-friendly reference code.
-        """
+        """Propose a purchase on behalf of the authenticated customer."""
         return propose_purchase_remote_handler(
             product_id=product_id,
             quantity=quantity,
         )
+
+    @server.tool(
+        name="confirm_purchase",
+        description="Confirm and execute a gated purchase using the signed confirmation_token."
+    )
+    def confirm_purchase_remote(
+        confirmation_token: str,
+    ) -> Dict[str, Any]:
+        """Confirm a gated purchase on behalf of the authenticated customer."""
+        return confirm_purchase_remote_handler(
+            confirmation_token=confirmation_token,
+        )
+

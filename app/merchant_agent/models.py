@@ -38,3 +38,22 @@ class InquiryResponse(BaseModel):
     quotes: List[ProductQuote] = Field(default_factory=list, description="List of matched product quotes ranked by relevance")
     merchant_notes: str = Field(..., description="Summary message and recommendation from the Merchant Sales Agent")
     total_matches: int = Field(..., description="Number of matching products found")
+
+
+class AddOnRecommendationRequest(BaseModel):
+    """
+    Request payload for smart merchant add-on and cross-sell recommendations.
+    """
+    product_id: str = Field(..., description="Base product ID being purchased (e.g. 'KB001')")
+    remaining_budget: Optional[float] = Field(default=None, description="Optional customer mandate budget headroom in INR (₹)")
+
+
+class AddOnRecommendationResponse(BaseModel):
+    """
+    Smart upsell / cross-sell response returned by the Merchant Agent.
+    """
+    base_product_id: str = Field(..., description="Base product ID")
+    addons: List[ProductQuote] = Field(default_factory=list, description="Complementary add-on items that fit within headroom")
+    merchant_pitch: str = Field(..., description="Merchant sales pitch explaining the value add")
+    total_addons: int = Field(..., description="Count of recommended add-on items")
+

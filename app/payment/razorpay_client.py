@@ -56,3 +56,36 @@ def create_order(amount_paise: int, receipt: str, notes: dict) -> dict:
         "payment_capture": 1,
         "notes": notes,
     })
+
+
+def verify_webhook_signature(body_bytes: bytes, signature: str, webhook_secret: str) -> bool:
+    """
+    Verifies Razorpay webhook payload signature using HMAC-SHA256.
+    """
+    import hashlib
+    import hmac
+    if not signature or not webhook_secret:
+        return False
+    expected = hmac.new(
+        webhook_secret.encode("utf-8"),
+        body_bytes,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def verify_payment_signature(razorpay_order_id: str, razorpay_payment_id: str, razorpay_signature: str) -> bool:
+    """
+    Verifies Razorpay client-side payment signature for checkout verification.
+    """
+    client = get_client()
+    try:
+        client.utility.verify_payment_signature({
+            "razorpay_order_id": razorpay_order_id,
+            "razorpay_payment_id": razorpay_payment_id,
+            "razorpay_signature": razorpay_signature,
+        })
+        return True
+    except Exception:
+        return False
+

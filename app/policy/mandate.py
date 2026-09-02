@@ -13,6 +13,7 @@ class Mandate(BaseModel):
     customer_id: str = Field(..., description="Unique customer identifier who authorized this mandate")
     display_name: str = Field(default="Demo Customer", description="Human display name of the customer (e.g. 'Dinesh Kumar')")
     max_transaction_amount: float = Field(..., gt=0, description="Maximum amount allowed per transaction in mandate currency")
+    daily_limit: Optional[float] = Field(default=5000.0, gt=0, description="Maximum total spend authorized per calendar day in mandate currency")
     currency: str = Field(default="INR", description="Currency code (e.g. INR)")
     allowed_categories: List[str] = Field(..., description="List of product categories authorized under this mandate")
     allowed_merchants: List[str] = Field(..., description="List of merchant identifiers authorized under this mandate")

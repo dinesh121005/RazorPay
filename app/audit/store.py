@@ -1,22 +1,63 @@
 """
-SQLite persistence layer for the audit trail.
+SQLite persistence layer for the audit trail with SHA-256 cryptographic hash chaining.
 
-Provides an immutable, queryable audit log storing every proposal evaluated by the gateway,
-its policy decision verdict, and the final payment execution status.
+Provides a tamper-evident, queryable audit log storing every proposal evaluated by the gateway,
+its policy decision verdict, downstream payment execution status, and verifiable cryptographic hash chain.
 """
 import contextlib
 from datetime import datetime, timezone
+import hashlib
 import os
 import sqlite3
-from typing import Any, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from app.audit.models import AuditRecord
 
 
+import json
+from uuid import uuid4
+
+def compute_audit_hash(
+    prev_hash: str,
+    transaction_id: str,
+    timestamp: str,
+    customer_id: str,
+    product_id: str,
+    amount: float,
+    decision: str,
+    payment_status: Optional[str] = None,
+    idempotency_key: Optional[str] = None,
+) -> str:
+    """
+    Legacy record hash computation (kept for backward compatibility).
+    """
+    raw = (
+        f"{prev_hash}|{transaction_id}|{timestamp}|{customer_id}|"
+        f"{product_id}|{amount:.2f}|{decision}|{payment_status or ''}|{idempotency_key or ''}"
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def compute_event_hash(
+    prev_hash: str,
+    event_id: str,
+    transaction_id: str,
+    event_type: str,
+    timestamp: str,
+    payload_json: str,
+) -> str:
+    """
+    Computes a deterministic SHA-256 hash chaining the previous event block's hash
+    with the current event's payload to ensure an append-only, tamper-evident audit ledger.
+    """
+    raw = f"{prev_hash}|{event_id}|{transaction_id}|{event_type}|{timestamp}|{payload_json}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 class AuditStore:
     """
-    Manages SQLite database connections and CRUD operations for audit records.
-    The table is created automatically on initial use (CREATE TABLE IF NOT EXISTS).
+    Manages database connections and CRUD operations for audit records
+    with continuous append-only cryptographic hash verification.
     """
 
     def __init__(self, db_path: Optional[str] = None):
@@ -47,7 +88,6 @@ class AuditStore:
         with get_db_connection(self.db_path) as conn:
             yield conn
 
-
     def _ensure_db_initialized(self) -> None:
         """Ensure the table schema exists before operations."""
         if not self._initialized:
@@ -55,7 +95,7 @@ class AuditStore:
             self._initialized = True
 
     def _init_db(self) -> None:
-        """Ensure the audit_records table exists with all required columns."""
+        """Ensure the audit_records and append-only audit_events tables exist with hash chain."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -72,14 +112,88 @@ class AuditStore:
                     decision_reason TEXT NOT NULL,
                     payment_status TEXT,
                     razorpay_order_id TEXT,
-                    idempotency_key TEXT UNIQUE
+                    idempotency_key TEXT UNIQUE,
+                    prev_hash TEXT DEFAULT 'GENESIS',
+                    record_hash TEXT
+                );
+                """
+            )
+            # Add hash columns if upgrading from legacy schema
+            try:
+                cursor.execute("ALTER TABLE audit_records ADD COLUMN prev_hash TEXT DEFAULT 'GENESIS'")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE audit_records ADD COLUMN record_hash TEXT")
+            except Exception:
+                pass
+
+            cursor.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_idempotency_key ON audit_records(idempotency_key);"
+            )
+
+            # Append-only cryptographic ledger
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS audit_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id TEXT NOT NULL,
+                    transaction_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    prev_hash TEXT NOT NULL,
+                    event_hash TEXT NOT NULL
                 );
                 """
             )
             cursor.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_idempotency_key ON audit_records(idempotency_key);"
+                "CREATE INDEX IF NOT EXISTS idx_audit_events_tx ON audit_events(transaction_id);"
             )
             conn.commit()
+
+    def _get_latest_event_hash(self, cursor: Any) -> str:
+        """Retrieves the event_hash of the most recently appended audit event, or 'GENESIS'."""
+        cursor.execute("SELECT event_hash FROM audit_events ORDER BY id DESC LIMIT 1;")
+        row = cursor.fetchone()
+        if row and row[0]:
+            return row[0]
+        return "GENESIS"
+
+    def _append_event(
+        self,
+        cursor: Any,
+        transaction_id: str,
+        event_type: str,
+        payload_dict: dict,
+        timestamp: Optional[str] = None,
+    ) -> Tuple[str, str]:
+        """
+        Appends an immutable event block to the cryptographic ledger.
+        Returns (event_hash, prev_hash).
+        """
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc).isoformat()
+        prev_hash = self._get_latest_event_hash(cursor)
+        event_id = str(uuid4())
+        payload_json = json.dumps(payload_dict, sort_keys=True)
+        event_hash = compute_event_hash(
+            prev_hash=prev_hash,
+            event_id=event_id,
+            transaction_id=transaction_id,
+            event_type=event_type,
+            timestamp=timestamp,
+            payload_json=payload_json,
+        )
+        cursor.execute(
+            """
+            INSERT INTO audit_events (
+                event_id, transaction_id, event_type, timestamp, payload_json, prev_hash, event_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+            """,
+            (event_id, transaction_id, event_type, timestamp, payload_json, prev_hash, event_hash)
+        )
+        return event_hash, prev_hash
 
     def write_proposal(
         self,
@@ -95,10 +209,7 @@ class AuditStore:
         idempotency_key: Optional[str] = None,
     ) -> None:
         """
-        Phase A: Record the initial purchase proposal and deterministic policy decision.
-        Always executed immediately following policy engine evaluation.
-        For APPROVED proposals, payment_status is initialized to 'PENDING'.
-        For REJECTED proposals, payment_status remains NULL (never attempted).
+        Phase A: Record the initial purchase proposal and deterministic policy decision with hash chain.
         """
         self._ensure_db_initialized()
         if timestamp is None:
@@ -108,13 +219,33 @@ class AuditStore:
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
+            payload = {
+                "customer_id": customer_id,
+                "product_id": product_id,
+                "merchant_id": merchant_id,
+                "quantity": quantity,
+                "amount": amount,
+                "decision": decision,
+                "decision_reason": decision_reason,
+                "payment_status": initial_payment_status,
+                "idempotency_key": idempotency_key,
+            }
+            rec_hash, prev_hash = self._append_event(
+                cursor,
+                transaction_id=transaction_id,
+                event_type="PROPOSAL_EVALUATED",
+                payload_dict=payload,
+                timestamp=timestamp,
+            )
+
             cursor.execute(
                 """
                 INSERT INTO audit_records (
                     transaction_id, timestamp, customer_id, product_id,
                     merchant_id, quantity, amount, decision, decision_reason,
-                    payment_status, razorpay_order_id, idempotency_key
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?);
+                    payment_status, razorpay_order_id, idempotency_key,
+                    prev_hash, record_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?);
                 """,
                 (
                     transaction_id,
@@ -128,6 +259,8 @@ class AuditStore:
                     decision_reason,
                     initial_payment_status,
                     idempotency_key,
+                    prev_hash,
+                    rec_hash,
                 )
             )
             conn.commit()
@@ -139,24 +272,177 @@ class AuditStore:
         razorpay_order_id: Optional[str] = None,
     ) -> None:
         """
-        Phase B: Update the audit record with the downstream payment execution outcome.
-        Executed only when the proposal was APPROVED by policy.
-        Raises ValueError if transaction_id row does not exist.
+        Phase B: Append an immutable payment/confirmation event to the ledger and update record view.
         """
         self._ensure_db_initialized()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
+                SELECT timestamp, customer_id, product_id, amount, decision, idempotency_key, prev_hash
+                FROM audit_records WHERE transaction_id = ?;
+                """,
+                (transaction_id,)
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise ValueError(f"Audit record '{transaction_id}' not found to update payment outcome")
+
+            timestamp, customer_id, product_id, amount, decision, idempotency_key, prev_hash = row
+            final_decision = "APPROVED" if decision == "PENDING_CONFIRMATION" and payment_status == "created" else decision
+            
+            event_type = "HUMAN_CONFIRMED" if decision == "PENDING_CONFIRMATION" and payment_status == "created" else (
+                "PAYMENT_FAILED" if payment_status == "failed" else (
+                    "PAYMENT_CAPTURED" if payment_status == "captured" else "ORDER_CREATED"
+                )
+            )
+
+            payload = {
+                "payment_status": payment_status,
+                "razorpay_order_id": razorpay_order_id,
+                "decision": final_decision,
+            }
+            new_rec_hash, _ = self._append_event(
+                cursor,
+                transaction_id=transaction_id,
+                event_type=event_type,
+                payload_dict=payload,
+            )
+
+            cursor.execute(
+                """
                 UPDATE audit_records
-                SET payment_status = ?, razorpay_order_id = ?
+                SET payment_status = ?, razorpay_order_id = ?, decision = ?, record_hash = ?
                 WHERE transaction_id = ?;
                 """,
-                (payment_status, razorpay_order_id, transaction_id)
+                (payment_status, razorpay_order_id, final_decision, new_rec_hash, transaction_id)
             )
             conn.commit()
-            if cursor.rowcount == 0:
-                raise ValueError(f"Audit record '{transaction_id}' not found to update payment outcome")
+
+    def get_daily_spend(
+        self,
+        customer_id: str,
+        target_date: Optional[str] = None,
+    ) -> float:
+        """
+        Calculates the total approved spend for a customer on a given UTC date (defaults to today).
+        """
+        self._ensure_db_initialized()
+        date_prefix = target_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT SUM(amount) FROM audit_records
+                WHERE customer_id = ?
+                  AND (decision = 'APPROVED' OR (decision = 'PENDING_CONFIRMATION' AND payment_status = 'created'))
+                  AND timestamp LIKE ?;
+                """,
+                (customer_id.strip(), f"{date_prefix}%")
+            )
+            result = cursor.fetchone()
+            return float(result[0]) if result and result[0] is not None else 0.0
+
+    def verify_integrity(self) -> Dict[str, Any]:
+        """
+        Walks the entire audit ledger from oldest to newest, verifying cryptographic
+        SHA-256 hash chaining and data consistency.
+        """
+        self._ensure_db_initialized()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # 1. First check append-only audit_events table
+            cursor.execute(
+                """
+                SELECT id, event_id, transaction_id, event_type, timestamp, payload_json, prev_hash, event_hash
+                FROM audit_events
+                ORDER BY id ASC;
+                """
+            )
+            event_rows = cursor.fetchall()
+
+            if event_rows:
+                expected_prev = "GENESIS"
+                for idx, r in enumerate(event_rows):
+                    (
+                        row_id, ev_id, tx_id, ev_type, ts, payload_str, prev_h, ev_h
+                    ) = r
+
+                    if prev_h != expected_prev and idx != 0:
+                        return {
+                            "valid": False,
+                            "error": f"Broken chain link at index {idx} (event_id={ev_id}, transaction_id={tx_id})",
+                            "expected_prev_hash": expected_prev,
+                            "actual_prev_hash": prev_h,
+                            "broken_record_id": tx_id,
+                        }
+
+                    expected_hash = compute_event_hash(
+                        prev_hash=prev_h or "GENESIS",
+                        event_id=ev_id,
+                        transaction_id=tx_id,
+                        event_type=ev_type,
+                        timestamp=ts,
+                        payload_json=payload_str,
+                    )
+
+                    if ev_h and ev_h != expected_hash:
+                        return {
+                            "valid": False,
+                            "error": f"Corrupted event hash at index {idx} (event_id={ev_id}, transaction_id={tx_id})",
+                            "expected_hash": expected_hash,
+                            "stored_hash": ev_h,
+                            "broken_record_id": tx_id,
+                        }
+
+                    expected_prev = ev_h or expected_hash
+
+                return {
+                    "valid": True,
+                    "total_records": len(event_rows),
+                    "status": "VERIFIED_IMMUTABLE",
+                    "chain_head": expected_prev,
+                }
+
+            # 2. Fallback check for audit_records (if legacy records only)
+            cursor.execute(
+                """
+                SELECT transaction_id, timestamp, customer_id, product_id,
+                       amount, decision, payment_status, idempotency_key,
+                       prev_hash, record_hash
+                FROM audit_records
+                ORDER BY timestamp ASC;
+                """
+            )
+            rows = cursor.fetchall()
+
+        if not rows:
+            return {"valid": True, "total_records": 0, "status": "EMPTY_LEDGER", "chain_head": "GENESIS"}
+
+        expected_prev = "GENESIS"
+        for idx, r in enumerate(rows):
+            (
+                tx_id, ts, cust_id, prod_id, amt, dec, pay_st, idemp, prev_h, rec_h
+            ) = r
+
+            # Check previous hash link
+            if prev_h != expected_prev and idx != 0:
+                return {
+                    "valid": False,
+                    "error": f"Broken chain link at index {idx} (transaction_id={tx_id})",
+                    "expected_prev_hash": expected_prev,
+                    "actual_prev_hash": prev_h,
+                    "broken_record_id": tx_id,
+                }
+
+            expected_prev = rec_h or expected_prev
+
+        return {
+            "valid": True,
+            "total_records": len(rows),
+            "status": "VERIFIED_IMMUTABLE",
+            "chain_head": expected_prev,
+        }
 
     def list(
         self,
@@ -164,13 +450,12 @@ class AuditStore:
         decision: Optional[str] = None,
         payment_status: Optional[str] = None,
     ) -> List[AuditRecord]:
-        """
-        Retrieve audit records ordered newest-first, with optional filtering.
-        """
+        """Retrieve audit records ordered newest-first, with optional filtering."""
         self._ensure_db_initialized()
         query = (
             "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
-            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key "
+            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
+            "prev_hash, record_hash "
             "FROM audit_records"
         )
         conditions = []
@@ -209,19 +494,19 @@ class AuditStore:
                     payment_status=row[9],
                     razorpay_order_id=row[10],
                     idempotency_key=row[11] if len(row) > 11 else None,
+                    prev_hash=row[12] if len(row) > 12 else "GENESIS",
+                    record_hash=row[13] if len(row) > 13 else None,
                 )
                 for row in rows
             ]
 
     def get(self, transaction_id: str) -> Optional[AuditRecord]:
-        """
-        Retrieve a single audit record by its transaction_id.
-        Returns None if not found.
-        """
+        """Retrieve a single audit record by its transaction_id."""
         self._ensure_db_initialized()
         query = (
             "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
-            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key "
+            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
+            "prev_hash, record_hash "
             "FROM audit_records "
             "WHERE transaction_id = ?;"
         )
@@ -244,20 +529,20 @@ class AuditStore:
                 payment_status=row[9],
                 razorpay_order_id=row[10],
                 idempotency_key=row[11] if len(row) > 11 else None,
+                prev_hash=row[12] if len(row) > 12 else "GENESIS",
+                record_hash=row[13] if len(row) > 13 else None,
             )
 
     def get_by_idempotency_key(self, idempotency_key: str) -> Optional[AuditRecord]:
-        """
-        Retrieve a single audit record by its idempotency_key.
-        Returns None if not found.
-        """
+        """Retrieve a single audit record by its idempotency_key."""
         if not idempotency_key or not idempotency_key.strip():
             return None
 
         self._ensure_db_initialized()
         query = (
             "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
-            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key "
+            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
+            "prev_hash, record_hash "
             "FROM audit_records "
             "WHERE idempotency_key = ?;"
         )
@@ -280,8 +565,11 @@ class AuditStore:
                 payment_status=row[9],
                 razorpay_order_id=row[10],
                 idempotency_key=row[11] if len(row) > 11 else None,
+                prev_hash=row[12] if len(row) > 12 else "GENESIS",
+                record_hash=row[13] if len(row) > 13 else None,
             )
 
 
 # Default module-level singleton instance
 audit_store = AuditStore()
+

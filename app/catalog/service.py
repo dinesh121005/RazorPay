@@ -63,3 +63,24 @@ def get_product(product_id: str) -> Product:
             return product
 
     raise ProductNotFoundError(product_id)
+
+
+def decrement_stock(product_id: str, quantity: int = 1) -> bool:
+    """
+    Safely decrements inventory stock for a product upon purchase confirmation.
+    Returns True if stock was decremented successfully, False if insufficient stock.
+    """
+    product = get_product(product_id)
+    if product.stock >= quantity:
+        product.stock -= quantity
+        return True
+    return False
+
+
+def restore_stock(product_id: str, quantity: int = 1) -> None:
+    """
+    Restores inventory stock for a product if an order is cancelled or rolled back.
+    """
+    product = get_product(product_id)
+    product.stock += quantity
+

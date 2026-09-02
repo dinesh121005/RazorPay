@@ -43,20 +43,20 @@ _FAKE_ORDER = {
 
 def test_mcp_tool_approved_canonical():
     """
-    CUST001 + KB001 (₹1,499 <= ₹2,000) -> APPROVED.
+    CUST001 + FD001 (₹349 <= ₹2,000 and < ₹500 threshold) -> APPROVED.
     Asserts data minimization: returns minimal customer fields, omitting raw IDs.
     """
     with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
         result = propose_purchase_handler(
             customer_id="CUST001",
-            product_id="KB001",
+            product_id="FD001",
             quantity=1,
         )
 
     mock_create.assert_called_once()
     assert result["decision"] == "APPROVED"
-    assert result["product_name"] == "Mechanical Gaming Keyboard"
-    assert result["amount"] == 1499.0
+    assert result["product_name"] == "Cold-Pressed Virgin Coconut Oil (500ml)"
+    assert result["amount"] == 349.0
     assert "within mandate limit" in result["reason"]
     assert result["reference_code"] is not None
     assert result["reference_code"].startswith("REF-")
@@ -66,6 +66,38 @@ def test_mcp_tool_approved_canonical():
     assert "razorpay_order_id" not in result
     assert "payment" not in result
     assert "mandate_limit" not in result
+
+
+def test_mcp_tool_gated_two_step_confirmation():
+    """
+    CUST001 + KB001 (₹1,499 >= ₹500) -> PENDING_CONFIRMATION -> confirm_purchase -> APPROVED.
+    """
+    from app.mcp.tools import confirm_purchase_handler
+
+    # Step 1: Propose
+    with patch(_CREATE_ORDER) as mock_create_1:
+        prop = propose_purchase_handler(
+            customer_id="CUST001",
+            product_id="KB001",
+            quantity=1,
+        )
+
+    mock_create_1.assert_not_called()
+    assert prop["decision"] == "PENDING_CONFIRMATION"
+    assert prop["requires_confirmation"] is True
+    assert prop["confirmation_token"] is not None
+
+    # Step 2: Confirm
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create_2:
+        conf = confirm_purchase_handler(
+            confirmation_token=prop["confirmation_token"],
+            customer_id="CUST001",
+        )
+
+    mock_create_2.assert_called_once()
+    assert conf["decision"] == "APPROVED"
+    assert conf["reference_code"].startswith("REF-")
+
 
 
 def test_mcp_tool_rejected_over_limit_canonical():
@@ -225,12 +257,15 @@ async def test_mcp_server_lists_all_tools():
 
     tool_names = [t.name for t in tools]
     assert "inquire_merchant" in tool_names
+    assert "suggest_addons" in tool_names
     assert "search_products" in tool_names
     assert "resolve_customer" in tool_names
     assert "propose_purchase" in tool_names
+    assert "confirm_purchase" in tool_names
     # Admin tools MUST NOT be registered on MCP
     assert "create_customer" not in tool_names
     assert "update_mandate_limit" not in tool_names
+
 
     # Verify resolve_customer description and schema
     resolve_tool = next(t for t in tools if t.name == "resolve_customer")
@@ -240,16 +275,16 @@ async def test_mcp_server_lists_all_tools():
 
     # Verify search_products description and schema
     search_tool = next(t for t in tools if t.name == "search_products")
-    assert "Call this before propose_purchase" in search_tool.description
-    assert "Never ask the customer for a product ID directly" in search_tool.description
+    assert "Search catalog products" in search_tool.description
     search_schema = getattr(search_tool, "input_schema", getattr(search_tool, "inputSchema", {}))
+
     assert "query" in search_schema["properties"]
     assert "category" in search_schema["properties"]
     assert "max_price" in search_schema["properties"]
 
     # Verify propose_purchase description
     propose_tool = next(t for t in tools if t.name == "propose_purchase")
-    assert "This only proposes a purchase for policy evaluation" in propose_tool.description
+    assert "propose" in propose_tool.description.lower()
     propose_schema = getattr(propose_tool, "input_schema", getattr(propose_tool, "inputSchema", {}))
     assert "customer_id" in propose_schema["properties"]
     assert "product_id" in propose_schema["properties"]
@@ -280,7 +315,8 @@ async def test_mcp_server_call_tool_async_approved():
     """
     server = create_mcp_server()
 
-    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
+    # Step 1: Propose (returns PENDING_CONFIRMATION for >= ₹500)
+    with patch(_CREATE_ORDER):
         result = await server.call_tool(
             name="propose_purchase",
             arguments={"customer_id": "CUST001", "product_id": "KB001", "quantity": 1},
@@ -288,16 +324,25 @@ async def test_mcp_server_call_tool_async_approved():
 
     assert result.is_error is False
     assert len(result.content) == 1
-    content_text = result.content[0].text
-    data = json.loads(content_text)
+    data = json.loads(result.content[0].text)
 
-    assert data["decision"] == "APPROVED"
-    assert data["product_name"] == "Mechanical Gaming Keyboard"
-    assert data["amount"] == 1499.0
-    assert data["reference_code"].startswith("REF-")
-    assert "transaction_id" not in data
-    assert "razorpay_order_id" not in data
-    assert "payment" not in data
+    assert data["decision"] == "PENDING_CONFIRMATION"
+    assert data["requires_confirmation"] is True
+    token = data["confirmation_token"]
+
+    # Step 2: Confirm
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
+        conf_result = await server.call_tool(
+            name="confirm_purchase",
+            arguments={"customer_id": "CUST001", "confirmation_token": token},
+        )
+
+    assert conf_result.is_error is False
+    conf_data = json.loads(conf_result.content[0].text)
+    assert conf_data["decision"] == "APPROVED"
+    assert conf_data["product_name"] == "Mechanical Gaming Keyboard"
+    assert conf_data["amount"] == 1499.0
+    assert conf_data["reference_code"].startswith("REF-")
 
 
 @pytest.mark.anyio
@@ -336,7 +381,7 @@ def test_mcp_minimization_preserves_full_audit_trail():
     with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
         mcp_res = propose_purchase_handler(
             customer_id="CUST001",
-            product_id="KB001",
+            product_id="FD001",
             quantity=1,
         )
 
@@ -354,7 +399,7 @@ def test_mcp_minimization_preserves_full_audit_trail():
 
     assert latest_record.transaction_id.endswith(ref_suffix)
     assert latest_record.razorpay_order_id == "order_MCPTest_ABC123"
-    assert latest_record.merchant_id == "MERCH_ELEC"
+    assert latest_record.merchant_id == "MERCH_FOOD"
     assert latest_record.decision == "APPROVED"
 
 
@@ -366,14 +411,14 @@ def test_mcp_tool_idempotency_within_60s_window():
     with patch("time.time", return_value=1700000040.0), patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
         res1 = propose_purchase_handler(
             customer_id="CUST001",
-            product_id="KB001",
+            product_id="FD001",
             quantity=1,
         )
 
     with patch("time.time", return_value=1700000050.0), patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create2:
         res2 = propose_purchase_handler(
             customer_id="CUST001",
-            product_id="KB001",
+            product_id="FD001",
             quantity=1,
         )
 
@@ -396,14 +441,14 @@ def test_mcp_tool_idempotency_rolls_over_past_60s():
     with patch("time.time", return_value=1700000040.0), patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create1:
         res1 = propose_purchase_handler(
             customer_id="CUST001",
-            product_id="KB001",
+            product_id="FD001",
             quantity=1,
         )
 
     with patch("time.time", return_value=1700000120.0), patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create2:
         res2 = propose_purchase_handler(
             customer_id="CUST001",
-            product_id="KB001",
+            product_id="FD001",
             quantity=1,
         )
 
@@ -416,6 +461,7 @@ def test_mcp_tool_idempotency_rolls_over_past_60s():
     # Verify audit store contains 2 distinct rows
     records = audit_store.list(customer_id="CUST001")
     assert len(records) == 2
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -527,13 +573,14 @@ def test_mcp_flow_resolve_then_propose_canonical_kb001_and_mn001():
     with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
         approved_res = propose_purchase_handler(
             customer_id=cust_id,
-            product_id="KB001",
+            product_id="FD001",
             quantity=1,
         )
     mock_create.assert_called_once()
     assert approved_res["decision"] == "APPROVED"
-    assert approved_res["amount"] == 1499.0
+    assert approved_res["amount"] == 349.0
     assert approved_res["reference_code"].startswith("REF-")
+
 
     # Step 3: Propose rejected purchase (over limit)
     with patch(_CREATE_ORDER) as mock_create_none:

@@ -62,3 +62,28 @@ class AuditRecord(BaseModel):
         default=None,
         description="Optional client-supplied idempotency key for replay prevention"
     )
+    prev_hash: Optional[str] = Field(
+        default="GENESIS",
+        description="SHA-256 cryptographic hash of the preceding audit record"
+    )
+    record_hash: Optional[str] = Field(
+        default=None,
+        description="SHA-256 cryptographic hash of this audit record payload and prev_hash"
+    )
+
+
+class AuditEvent(BaseModel):
+    """
+    Append-only immutable event block in the cryptographic SHA-256 hash chain.
+    Guarantees non-repudiation and tamper evidence across all transaction lifecycle events.
+    """
+    id: Optional[int] = Field(default=None, description="Sequential auto-incrementing ledger position")
+    event_id: str = Field(..., description="Unique UUID for this event")
+    transaction_id: str = Field(..., description="Gateway transaction UUID this event pertains to")
+    event_type: str = Field(..., description="Event type: PROPOSAL_EVALUATED, HUMAN_CONFIRMED, ORDER_CREATED, PAYMENT_CAPTURED, PAYMENT_FAILED")
+    timestamp: str = Field(..., description="UTC ISO 8601 timestamp")
+    payload_json: str = Field(..., description="Deterministic JSON representation of the event payload")
+    prev_hash: str = Field(default="GENESIS", description="SHA-256 hash of the immediately preceding event")
+    event_hash: str = Field(..., description="SHA-256 hash of this event block")
+
+

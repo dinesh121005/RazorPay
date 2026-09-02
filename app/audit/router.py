@@ -47,6 +47,19 @@ def list_audit_records(
 
 
 @router.get(
+    "/verify",
+    status_code=status.HTTP_200_OK,
+    summary="Cryptographic SHA-256 Audit Chain Verification",
+    description="Walks the full audit ledger, verifying mathematical SHA-256 hash chaining and tamper-free immutability."
+)
+def verify_audit_ledger() -> dict:
+    """
+    Cryptographic verification endpoint traversing and validating the immutable hash chain.
+    """
+    return audit_store.verify_integrity()
+
+
+@router.get(
     "/{transaction_id}",
     response_model=AuditRecord,
     status_code=status.HTTP_200_OK,
@@ -54,6 +67,7 @@ def list_audit_records(
     description="Retrieve a specific audit record by its transaction ID (UUID)."
 )
 def get_audit_record(transaction_id: str) -> AuditRecord:
+
     """
     Fetch a single audit record by transaction_id or return 404 if not found.
     """

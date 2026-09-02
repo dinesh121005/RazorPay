@@ -2,7 +2,11 @@ from app.policy.mandate import Mandate
 from app.policy.requests import PolicyDecision, PurchaseRequest, RuleViolated
 
 
-def evaluate(purchase_request: PurchaseRequest, mandate: Mandate) -> PolicyDecision:
+def evaluate(
+    purchase_request: PurchaseRequest,
+    mandate: Mandate,
+    current_daily_spend: float = 0.0,
+) -> PolicyDecision:
     """
     Pure, deterministic evaluation function that checks a proposed purchase request against a customer's mandate.
 
@@ -12,6 +16,7 @@ def evaluate(purchase_request: PurchaseRequest, mandate: Mandate) -> PolicyDecis
       3. merchant in allowed_merchants (case-insensitive, trimmed) -> MERCHANT_NOT_ALLOWED
       4. category in allowed_categories (case-insensitive, trimmed) -> CATEGORY_NOT_ALLOWED
       5. amount <= max_transaction_amount (inclusive boundary) -> AMOUNT_EXCEEDS_LIMIT
+      6. (current_daily_spend + amount) <= daily_limit -> DAILY_LIMIT_EXCEEDED
 
     Returns on the very first violated check. On approval, rule_violated is None.
     """
@@ -61,6 +66,19 @@ def evaluate(purchase_request: PurchaseRequest, mandate: Mandate) -> PolicyDecis
             rule_violated=RuleViolated.AMOUNT_EXCEEDS_LIMIT
         )
 
+    # 6. Cumulative Daily Spend Boundary Check
+    if mandate.daily_limit is not None and (current_daily_spend + purchase_request.amount) > mandate.daily_limit:
+        projected_spend = current_daily_spend + purchase_request.amount
+        return PolicyDecision(
+            status="REJECTED",
+            reason=(
+                f"Transaction amount ₹{purchase_request.amount:.2f} would take today's spend to "
+                f"₹{projected_spend:.2f}, exceeding the ₹{mandate.daily_limit:.2f} daily mandate cap "
+                f"(current spend today: ₹{current_daily_spend:.2f})"
+            ),
+            rule_violated=RuleViolated.DAILY_LIMIT_EXCEEDED
+        )
+
     # All checks passed successfully
     return PolicyDecision(
         status="APPROVED",
@@ -70,3 +88,4 @@ def evaluate(purchase_request: PurchaseRequest, mandate: Mandate) -> PolicyDecis
         ),
         rule_violated=None
     )
+

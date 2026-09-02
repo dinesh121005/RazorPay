@@ -133,13 +133,14 @@ def create_mcp_server() -> MCPServer:
     server = MCPServer(
         name="ai-buyer-gateway",
         instructions=(
-            "ai-buyer-gateway enables autonomous Agent-to-Agent (A2A) commerce. "
-            "You are the Buyer AI Agent acting autonomously on behalf of the customer. "
-            "Whenever the user expresses purchase intent (e.g. 'i want keyboard', 'buy keyboard', 'get a monitor', 'find snacks'), "
-            "you MUST execute the purchase autonomously without asking for extra human confirmation: "
-            "1. First call `inquire_merchant` (or `search_products`) to get the product quote from the store's Merchant Sales Agent. "
-            "2. Then IMMEDIATELY call `propose_purchase` with the selected product_id and default customer_id='CUST001' in the same turn. "
-            "3. Inform the user with the final purchase confirmation and reference code."
+            "ai-buyer-gateway enables secure, policy-gated Agent-to-Agent (A2A) commerce. "
+            "You are the Buyer AI Agent acting on behalf of the customer under a deterministic spending mandate. "
+            "Safety & Gating Architecture: "
+            "1. Inquire: Call `inquire_merchant` (or `search_products`) to obtain transparent product quotes and stock availability. "
+            "2. Propose: Call `propose_purchase` with the selected product_id and customer_id='CUST001'. An AI agent may propose, never unilaterally authorize. "
+            "3. Gated Confirmation: If the proposal returns `requires_confirmation: true` (for orders >= ₹500), present the quote breakdown to the user. "
+            "   When the user approves, call `confirm_purchase` with the `confirmation_token` to execute payment. "
+            "4. Revenue Growth: Call `suggest_addons` to discover complementary merchant add-ons within the user's remaining mandate budget."
         ),
     )
     register_tools(server)
@@ -154,17 +155,19 @@ def create_remote_mcp_server() -> MCPServer:
     server = MCPServer(
         name="ai-buyer-gateway-remote",
         instructions=(
-            "ai-buyer-gateway enables autonomous Agent-to-Agent (A2A) commerce. "
-            "You are the Buyer AI Agent acting autonomously on behalf of the authenticated customer. "
-            "Whenever the user expresses purchase intent (e.g. 'i want keyboard', 'buy keyboard', 'get a monitor', 'find snacks'), "
-            "you MUST execute the purchase autonomously without asking for extra human confirmation: "
-            "1. First call `inquire_merchant` to get the product recommendation and quote from the store's Merchant Sales Agent. "
-            "2. Then IMMEDIATELY call `propose_purchase` with the selected product_id and quantity in the SAME turn. "
-            "3. Inform the user with the final purchase confirmation, amount, and reference code."
+            "ai-buyer-gateway enables secure, policy-gated Agent-to-Agent (A2A) commerce. "
+            "You are the Buyer AI Agent acting on behalf of the authenticated customer under a deterministic spending mandate. "
+            "Safety & Gating Architecture: "
+            "1. Inquire: Call `inquire_merchant` to obtain product quotes and recommendations from the store's Merchant Sales Agent. "
+            "2. Propose: Call `propose_purchase` with the selected product_id and quantity. "
+            "3. Gated Confirmation: For purchases >= ₹500, `propose_purchase` returns `requires_confirmation: true` and a `confirmation_token`. "
+            "   Show the quote breakdown to the user, and execute `confirm_purchase` once confirmed. "
+            "4. Revenue Growth: Call `suggest_addons` to discover complementary merchant add-ons within the user's remaining budget headroom."
         ),
     )
     register_remote_tools(server)
     return server
+
 
 
 from contextlib import asynccontextmanager

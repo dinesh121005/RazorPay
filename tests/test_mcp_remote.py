@@ -76,7 +76,9 @@ def test_remote_mcp_tool_schema_omits_customer_id():
         tool_names = [t.name for t in tools]
         assert "inquire_merchant" in tool_names
         assert "search_products" in tool_names
+        assert "suggest_addons" in tool_names
         assert "propose_purchase" in tool_names
+        assert "confirm_purchase" in tool_names
         # resolve_customer is not needed on remote path
         assert "resolve_customer" not in tool_names
 
@@ -91,27 +93,41 @@ def test_remote_mcp_tool_schema_omits_customer_id():
     anyio.run(_check_tools)
 
 
-def test_remote_mcp_propose_purchase_authenticated_success():
+def test_remote_mcp_propose_and_confirm_purchase_authenticated_flow():
     """
     When authenticated as CUST001 via OAuth context, propose_purchase_remote_handler
-    executes purchase under CUST001's spending mandate without caller supplying customer_id.
+    evaluates mandate and returns confirmation token for gated purchase (>= ₹500).
+    confirm_purchase_remote_handler then finalizes order.
     """
+    from app.mcp.tools import confirm_purchase_remote_handler
+
     token_reset = authenticated_customer_id.set("CUST001")
     try:
-        with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
-            result = propose_purchase_remote_handler(
+        # Step 1: Propose (Gated)
+        with patch(_CREATE_ORDER) as mock_create_1:
+            prop_result = propose_purchase_remote_handler(
                 product_id="KB001",
                 quantity=1,
             )
+        mock_create_1.assert_not_called()
+        assert prop_result["decision"] == "PENDING_CONFIRMATION"
+        assert prop_result["requires_confirmation"] is True
+        assert prop_result["confirmation_token"] is not None
 
-        mock_create.assert_called_once()
-        assert result["decision"] == "APPROVED"
-        assert result["product_name"] == "Mechanical Gaming Keyboard"
-        assert result["amount"] == 1499.0
-        assert result["reference_code"].startswith("REF-")
+        # Step 2: Confirm
+        with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create_2:
+            conf_result = confirm_purchase_remote_handler(
+                confirmation_token=prop_result["confirmation_token"],
+            )
+
+        mock_create_2.assert_called_once()
+        assert conf_result["decision"] == "APPROVED"
+        assert conf_result["product_name"] == "Mechanical Gaming Keyboard"
+        assert conf_result["amount"] == 1499.0
+        assert conf_result["reference_code"].startswith("REF-")
         # Assert data minimization
-        assert "transaction_id" not in result
-        assert "razorpay_order_id" not in result
+        assert "transaction_id" not in conf_result
+        assert "razorpay_order_id" not in conf_result
     finally:
         authenticated_customer_id.reset(token_reset)
 
@@ -131,6 +147,7 @@ def test_remote_mcp_propose_purchase_unauthenticated_rejection():
         assert "Unauthenticated" in result["reason"]
     finally:
         authenticated_customer_id.reset(token_reset)
+
 
 
 def test_remote_mcp_impersonation_immunity():
@@ -180,7 +197,7 @@ def test_razorpay_token_isolation():
     try:
         with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
             propose_purchase_remote_handler(
-                product_id="KB001",
+                product_id="FD001",
                 quantity=1,
             )
 
@@ -195,3 +212,4 @@ def test_razorpay_token_isolation():
         assert "Bearer" not in serialized_args
     finally:
         authenticated_customer_id.reset(token_reset)
+
