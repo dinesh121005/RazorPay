@@ -1,24 +1,47 @@
-"""
-Authentication and authorization module for administrative and audit endpoints.
-
-Enforces API key / Bearer token security on administrative operations to prevent
-unauthorized mandate tampering or data leakage.
-"""
+import logging
 import os
+import secrets
 from typing import Optional
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Request, status
 
+logger = logging.getLogger("gateway.auth")
 
-from typing import Optional
-from fastapi import HTTPException, Request, status
+_AUTO_GENERATED_PROD_KEY: Optional[str] = None
 
 
 def get_admin_api_key() -> str:
     """
     Retrieve the configured ADMIN_API_KEY from the environment.
-    Defaults to 'dev-admin-secret-key' in development/test if not set.
+    
+    Security Posture:
+    - In Development/Testing: Defaults to 'dev-admin-secret-key' for developer ergonomics.
+    - In Production: If ADMIN_API_KEY is not set or set to default, securely auto-generates
+      an ephemeral 256-bit cryptographic token (preventing default credential compromise)
+      and logs a prominent security warning for the operator.
     """
-    return os.environ.get("ADMIN_API_KEY", "dev-admin-secret-key")
+    global _AUTO_GENERATED_PROD_KEY
+    env_key = os.environ.get("ADMIN_API_KEY")
+    is_prod = os.environ.get("ENVIRONMENT", os.environ.get("ENV", "development")).lower() == "production" or bool(os.environ.get("RENDER"))
+
+    if env_key and env_key != "dev-admin-secret-key":
+        return env_key
+
+    if is_prod:
+        if _AUTO_GENERATED_PROD_KEY is None:
+            _AUTO_GENERATED_PROD_KEY = secrets.token_urlsafe(32)
+            logger.warning(
+                "====================================================================\n"
+                "🔒 PRODUCTION SECURITY ALERT: ADMIN_API_KEY not configured!\n"
+                "To prevent unauthorized access with default credentials, an ephemeral\n"
+                "cryptographic secret was auto-generated for this session:\n"
+                "  ADMIN_API_KEY: %s\n"
+                "Please set ADMIN_API_KEY in your hosting environment variables.\n"
+                "====================================================================",
+                _AUTO_GENERATED_PROD_KEY,
+            )
+        return _AUTO_GENERATED_PROD_KEY
+
+    return "dev-admin-secret-key"
 
 
 def verify_admin_key(request: Request) -> str:

@@ -388,3 +388,129 @@ def test_webhook_invalid_signature_returns_400():
     )
     assert resp.status_code == 400
 
+
+def test_webhook_duplicate_event_deduplication():
+    """
+    POST /payment/webhook with the same event ID returns deduplicated 200 OK without re-processing.
+    """
+    import hmac
+    import hashlib
+    import json
+
+    secret = "dev-webhook-secret"
+    payload_dict = {
+        "event_id": "evt_dedup_test_999",
+        "event": "payment.captured",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_WebHookDedup999",
+                    "order_id": "order_Dedup999",
+                    "amount": 34900,
+                    "status": "captured",
+                    "notes": {
+                        "transaction_id": "txn-dedup-001"
+                    }
+                }
+            }
+        }
+    }
+    from app.audit import audit_store
+    audit_store.write_proposal(
+        transaction_id="txn-dedup-001",
+        customer_id="CUST001",
+        product_id="FD001",
+        merchant_id="MERCH_FOOD",
+        quantity=1,
+        amount=349.0,
+        decision="APPROVED",
+        decision_reason="Pre-seed for dedup test",
+    )
+
+    body_bytes = json.dumps(payload_dict).encode("utf-8")
+    sig = hmac.new(secret.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+
+    # First delivery
+    resp1 = client.post(
+        "/payment/webhook",
+        content=body_bytes,
+        headers={"X-Razorpay-Signature": sig, "Content-Type": "application/json", "X-Razorpay-Event-Id": "evt_dedup_test_999"},
+    )
+    assert resp1.status_code == 200
+    assert resp1.json()["deduplicated"] is False
+
+    # Second delivery (Duplicate retry from Razorpay)
+    resp2 = client.post(
+        "/payment/webhook",
+        content=body_bytes,
+        headers={"X-Razorpay-Signature": sig, "Content-Type": "application/json", "X-Razorpay-Event-Id": "evt_dedup_test_999"},
+    )
+    assert resp2.status_code == 200
+    assert resp2.json()["deduplicated"] is True
+
+
+def test_webhook_payment_failed_restores_inventory():
+    """
+    POST /payment/webhook on payment.failed automatically restores decremented stock for the product.
+    """
+    import hmac
+    import hashlib
+    import json
+    from app.catalog.service import get_product
+    from app.audit import audit_store
+
+    secret = "dev-webhook-secret"
+    prod = get_product("HK001")
+    initial_stock = prod.stock
+
+    # Pre-seed transaction
+    audit_store.write_proposal(
+        transaction_id="txn-fail-restore-001",
+        customer_id="CUST001",
+        product_id="HK001",
+        merchant_id="MERCH_ELEC",
+        quantity=2,
+        amount=998.0,
+        decision="APPROVED",
+        decision_reason="Pre-seed for failure restore test",
+    )
+    # Simulate stock decrement
+    prod.stock -= 2
+    assert prod.stock == initial_stock - 2
+
+    payload_dict = {
+        "event_id": "evt_fail_test_777",
+        "event": "payment.failed",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_WebHookFail777",
+                    "order_id": "order_Fail777",
+                    "amount": 99800,
+                    "status": "failed",
+                    "notes": {
+                        "transaction_id": "txn-fail-restore-001"
+                    }
+                }
+            }
+        }
+    }
+    body_bytes = json.dumps(payload_dict).encode("utf-8")
+    sig = hmac.new(secret.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+
+    resp = client.post(
+        "/payment/webhook",
+        content=body_bytes,
+        headers={"X-Razorpay-Signature": sig, "Content-Type": "application/json", "X-Razorpay-Event-Id": "evt_fail_test_777"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["event"] == "payment.failed"
+
+    # Inventory must be restored by +2
+    assert prod.stock == initial_stock
+
+    # Audit status must be failed
+    record = audit_store.get("txn-fail-restore-001")
+    assert record.payment_status == "failed"
+
+

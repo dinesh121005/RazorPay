@@ -7,15 +7,19 @@ signature verification to complete the full end-to-end payment lifecycle.
 import json
 import logging
 import os
-from typing import Optional
+from typing import Optional, Set
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from app.audit import audit_store
+from app.catalog.service import restore_stock
 from app.payment.razorpay_client import verify_payment_signature, verify_webhook_signature
 
 logger = logging.getLogger("gateway.payment.router")
 router = APIRouter(prefix="/payment", tags=["payment"])
+
+# In-memory deduplication cache for webhook event IDs (idempotency guard)
+_processed_webhook_event_ids: Set[str] = set()
 
 
 def get_webhook_secret() -> str:
@@ -64,15 +68,17 @@ def verify_payment(payload: PaymentVerificationRequest):
 async def razorpay_webhook(
     request: Request,
     x_razorpay_signature: Optional[str] = Header(None, alias="X-Razorpay-Signature"),
+    x_razorpay_event_id: Optional[str] = Header(None, alias="X-Razorpay-Event-Id"),
 ):
     """
     Processes incoming Razorpay webhook events (e.g. payment.captured, order.paid, payment.failed).
-    Verifies HMAC-SHA256 signature, updates the audit event ledger, and finalizes transaction status.
+    Verifies HMAC-SHA256 signature, ensures event deduplication (idempotency), updates the audit event ledger,
+    and compensates inventory on payment failure.
     """
     body_bytes = await request.body()
     webhook_secret = get_webhook_secret()
 
-    # Verify signature
+    # 1. Verify signature
     if not x_razorpay_signature or not verify_webhook_signature(body_bytes, x_razorpay_signature, webhook_secret):
         logger.warning("Rejected webhook: invalid or missing X-Razorpay-Signature")
         raise HTTPException(
@@ -80,6 +86,7 @@ async def razorpay_webhook(
             detail="Invalid webhook signature",
         )
 
+    # 2. Parse payload
     try:
         data = json.loads(body_bytes.decode("utf-8"))
     except Exception:
@@ -105,25 +112,54 @@ async def razorpay_webhook(
     notes = entity.get("notes", {})
     transaction_id = notes.get("transaction_id")
 
-    logger.info("Received Razorpay webhook event: %s for order: %s", event, order_id)
+    # 3. Deduplication Check (Idempotency Guard)
+    event_id = (
+        x_razorpay_event_id
+        or data.get("event_id")
+        or data.get("id")
+        or f"{event}:{order_id}:{entity.get('id', '')}"
+    )
 
+    if event_id in _processed_webhook_event_ids:
+        logger.info("Duplicate webhook event %s received — returning deduplicated 200 OK", event_id)
+        return {
+            "status": "ok",
+            "event": event,
+            "order_id": order_id,
+            "processed": True,
+            "deduplicated": True,
+        }
+
+    _processed_webhook_event_ids.add(event_id)
+    logger.info("Received and processing Razorpay webhook event: %s (id: %s) for order: %s", event, event_id, order_id)
+
+    # 4. State Transitions and Inventory Compensation
     if transaction_id:
-        if event in ("payment.captured", "order.paid"):
-            audit_store.update_payment_outcome(
-                transaction_id=transaction_id,
-                payment_status="captured",
-                razorpay_order_id=order_id,
-            )
-        elif event == "payment.failed":
-            audit_store.update_payment_outcome(
-                transaction_id=transaction_id,
-                payment_status="failed",
-                razorpay_order_id=order_id,
-            )
+        record = audit_store.get(transaction_id)
+        if record:
+            if event in ("payment.captured", "order.paid"):
+                audit_store.update_payment_outcome(
+                    transaction_id=transaction_id,
+                    payment_status="captured",
+                    razorpay_order_id=order_id,
+                )
+            elif event == "payment.failed":
+                # Automated inventory compensation: restore decremented stock
+                restore_stock(record.product_id, record.quantity)
+                logger.info("Restored %s units of %s after payment.failed event", record.quantity, record.product_id)
+
+                audit_store.update_payment_outcome(
+                    transaction_id=transaction_id,
+                    payment_status="failed",
+                    razorpay_order_id=order_id,
+                )
+        else:
+            logger.warning("Webhook received for unknown or untracked transaction: %s", transaction_id)
 
     return {
         "status": "ok",
         "event": event,
         "order_id": order_id,
-        "processed": bool(transaction_id),
+        "processed": bool(transaction_id and audit_store.get(transaction_id)),
+        "deduplicated": False,
     }

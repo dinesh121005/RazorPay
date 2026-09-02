@@ -153,6 +153,7 @@ Exposed directly to AI agents via `python -m app.mcp.server` and remote HTTP `/m
 ### 2. REST API Endpoints
 - **Catalog**: `GET /products`, `GET /products/{id}`
 - **Agent Purchasing**: `POST /agent/purchase` (Auth Protected), `POST /agent/confirm` (Auth Protected)
+- **Payment Rails & Webhooks**: `POST /payment/webhook` (HMAC-SHA256 signature verification), `POST /payment/verify`
 - **Merchant Intelligence**: `POST /merchant/inquire`, `POST /merchant/recommend-addons`
 - **Audit Ledger**: `GET /audit`, `GET /audit/{tx_id}`, `GET /audit/verify` (Cryptographic integrity check)
 - **Admin Management**: `GET /admin/customers`, `POST /admin/customers`, `PATCH /admin/customers/{id}/mandate`
@@ -163,13 +164,13 @@ Exposed directly to AI agents via `python -m app.mcp.server` and remote HTTP `/m
 
 ## 🧪 Verification & Test Suite Health
 
-The gateway includes an extensive automated test suite with **150 passed tests (100% pass rate)**:
+The gateway includes an extensive automated test suite with **155 passed tests (100% pass rate)**:
 
 ```
-============================== 150 passed in 85.38s ==============================
+============================== 155 passed in 105s ==============================
 - tests/test_policy_engine.py          : 23 passed (Boundary limits, expiry, category whitelists, daily caps)
-- tests/test_payments.py               : 16 passed (Razorpay orders, paise conversion, receipts, error isolation)
-- tests/test_audit.py                  : 12 passed (Immutable SQLite logging, SHA-256 hash chaining, verify)
+- tests/test_payments.py               : 20 passed (Razorpay orders, webhooks, deduplication, stock restore)
+- tests/test_audit.py                  : 13 passed (Immutable SQLite logging, append-only hash chaining, verify)
 - tests/test_oauth.py                  : 17 passed (JWT tokens, PBKDF2 hashing, refresh grants, sub claims)
 - tests/test_merchant_agent.py         : 11 passed (Gemini LLM reasoning, quote grounding, add-on recommendations)
 - tests/test_mcp.py                    : 24 passed (Local STDIO tools, confirmation gating, idempotency)

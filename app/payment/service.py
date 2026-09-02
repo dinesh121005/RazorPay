@@ -1,18 +1,19 @@
 """
-Payment service — orchestrates Razorpay order creation for policy-approved purchases.
+Payment service — orchestrates Razorpay Test Mode order creation and payment lifecycle.
+
+Payment Rails Architecture (2-Phase Execution):
+1. Phase 1 (Order Creation): Upon policy mandate approval and human confirmation,
+   creates an official Razorpay Order via `razorpay_client.create_order()` with
+   `payment_capture=1` and traceability notes. Returns `status="created"` with `razorpay_order_id`.
+2. Phase 2 (Payment Confirmation & Webhook Settlement): Server-to-server webhook callbacks
+   (`POST /payment/webhook`) and client signature verification (`POST /payment/verify`)
+   verify HMAC-SHA256 signatures, transitioning transaction state to `status="captured"`.
 
 Responsibilities:
-- Convert rupees (catalog/policy domain) → paise (Razorpay domain). This conversion
-  lives exclusively here; it must not appear in app/catalog/ or app/policy/.
-- Build the Razorpay `notes` payload for dashboard traceability.
+- Convert rupees (catalog/policy domain) → paise (Razorpay domain).
+- Build the Razorpay `notes` payload for cross-system dashboard traceability.
 - Call razorpay_client.create_order() and map the result to a PaymentResult.
-- Isolate all SDK exceptions: a Razorpay failure never alters the PolicyDecision.
-
-NOT in scope (Phase 5 boundary):
-- Payment capture beyond payment_capture=1 on order creation.
-- Signature verification.
-- Webhooks.
-- Refunds.
+- Isolate all SDK exceptions: a payment rail failure never corrupts the PolicyDecision.
 """
 import logging
 from app.payment import razorpay_client

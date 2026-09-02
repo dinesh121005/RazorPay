@@ -449,8 +449,10 @@ def register_remote_tools(server: MCPServer) -> None:
         name="propose_purchase",
         description=(
             "Propose a purchase transaction on behalf of the authenticated customer. "
-            "Customer identity is bound from OAuth. For orders >= ₹500, returns `requires_confirmation: true` "
-            "and a `confirmation_token` to be executed via `confirm_purchase`."
+            "Customer identity is bound strictly to verified OAuth JWT. "
+            "Mandatory Safety Protocol: For orders >= ₹500, this returns `requires_confirmation: true` and a `confirmation_token`. "
+            "As an AI Buyer Agent, you have proposal-only authority. You MUST present the full quote (item, quantity, ₹ amount) "
+            "to the human user and wait for their explicit approval before calling `confirm_purchase`."
         )
     )
     def propose_purchase_remote(
@@ -465,7 +467,10 @@ def register_remote_tools(server: MCPServer) -> None:
 
     @server.tool(
         name="confirm_purchase",
-        description="Confirm and execute a gated purchase using the signed confirmation_token."
+        description=(
+            "Confirm and execute payment rails for a previously proposed, gated purchase using the signed confirmation_token. "
+            "Protocol Guard: Call this ONLY after the human user has reviewed the proposal quote and explicitly authorized the payment."
+        )
     )
     def confirm_purchase_remote(
         confirmation_token: str,
