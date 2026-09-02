@@ -13,7 +13,16 @@ and preserved exclusively in the SQLite audit trail for admin inspection.
 from contextvars import ContextVar
 import logging
 from typing import Any, Dict, List, Optional
-from mcp.server.mcpserver import MCPServer
+try:
+    from mcp.server.mcpserver import MCPServer
+except ImportError:
+    try:
+        from mcp.server.fastmcp import FastMCP as MCPServer
+    except ImportError:
+        try:
+            from mcp.server import MCPServer
+        except ImportError:
+            from mcp.server import FastMCP as MCPServer
 
 from app.agent.service import (
     PurchaseResponse,

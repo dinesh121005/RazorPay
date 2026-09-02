@@ -13,7 +13,16 @@ load_dotenv(override=False)
 
 import jwt
 from fastapi import FastAPI
-from mcp.server.mcpserver import MCPServer
+try:
+    from mcp.server.mcpserver import MCPServer
+except ImportError:
+    try:
+        from mcp.server.fastmcp import FastMCP as MCPServer
+    except ImportError:
+        try:
+            from mcp.server import MCPServer
+        except ImportError:
+            from mcp.server import FastMCP as MCPServer
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
