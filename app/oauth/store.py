@@ -19,12 +19,34 @@ OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET", "claude-demo-secret")
 
 ALLOWED_REDIRECT_URIS: Set[str] = {
     "https://claude.ai/api/mcp/oauth_callback",
+    "https://claude.ai/api/mcp/oauth/callback",
+    "https://claude.ai/oauth/callback",
     "http://localhost:8000/oauth/callback",
     "https://localhost:8000/oauth/callback",
     "http://127.0.0.1:8000/oauth/callback",
     "https://127.0.0.1:8000/oauth/callback",
     "http://localhost:3000/callback",
 }
+
+
+def is_allowed_redirect_uri(redirect_uri: Optional[str]) -> bool:
+    """Validates whether a redirect_uri is allowed for OAuth authentication."""
+    if not redirect_uri:
+        return False
+    if redirect_uri in ALLOWED_REDIRECT_URIS:
+        return True
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(redirect_uri)
+        netloc = parsed.netloc.lower()
+        if netloc in ("claude.ai", "www.claude.ai", "staging.claude.ai", "localhost", "127.0.0.1") or netloc.endswith(".claude.ai") or netloc.endswith(".anthropic.com"):
+            return True
+        if netloc.startswith("localhost:") or netloc.startswith("127.0.0.1:"):
+            return True
+    except Exception:
+        pass
+    return False
+
 
 
 def _hash_token(raw_token: str) -> str:

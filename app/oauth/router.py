@@ -15,6 +15,7 @@ from app.oauth.store import (
     OAUTH_CLIENT_SECRET,
     auth_code_store,
     customer_auth_store,
+    is_allowed_redirect_uri,
 )
 
 router = APIRouter(tags=["oauth"])
@@ -105,7 +106,7 @@ def get_authorize_page(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid client_id: '{client_id}'."
         )
-    if redirect_uri not in ALLOWED_REDIRECT_URIS:
+    if not is_allowed_redirect_uri(redirect_uri):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unauthorized redirect_uri: '{redirect_uri}'."
@@ -191,7 +192,7 @@ async def post_authorize(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid client_id."
         )
-    if redirect_uri not in ALLOWED_REDIRECT_URIS:
+    if not is_allowed_redirect_uri(redirect_uri):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unauthorized redirect_uri."
