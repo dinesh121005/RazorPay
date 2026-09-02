@@ -187,7 +187,7 @@ def execute_purchase(
             decision_reason=decision.reason,
             idempotency_key=idempotency_key,
         )
-    except (sqlite3.IntegrityError, sqlite3.OperationalError):
+    except Exception:
         # Race condition & lock contention safeguard: check if concurrent request committed winning record
         existing_record = audit_store.get_by_idempotency_key(idempotency_key)
         if existing_record is not None:

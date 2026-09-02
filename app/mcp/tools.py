@@ -162,6 +162,16 @@ def propose_purchase_handler(
             "reason": str(e),
             "reference_code": None,
         }
+    except Exception as e:
+        import logging
+        logging.getLogger("gateway.mcp").error("Error executing purchase proposal: %s", e, exc_info=True)
+        return {
+            "decision": "REJECTED",
+            "product_name": product_id,
+            "amount": 0.0,
+            "reason": f"System error during purchase processing: {str(e)}",
+            "reference_code": None,
+        }
 
 
 def propose_purchase_remote_handler(
