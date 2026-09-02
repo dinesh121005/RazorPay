@@ -457,7 +457,8 @@ def register_remote_tools(server: MCPServer) -> None:
     @server.tool(
         name="propose_purchase",
         description=(
-            "Propose a purchase transaction on behalf of the authenticated customer. "
+            "Propose a single product purchase on behalf of the authenticated customer. "
+            "Pass exactly ONE specific product_id (e.g. 'FD005', 'KB001', 'HK001'). If purchasing multiple distinct items, call this tool once per item. "
             "Customer identity is bound strictly to verified OAuth JWT. "
             "Mandatory Safety Protocol: For orders >= ₹500, this returns `requires_confirmation: true` and a `confirmation_token`. "
             "As an AI Buyer Agent, you have proposal-only authority. You MUST present the full quote (item, quantity, ₹ amount) "
@@ -470,7 +471,7 @@ def register_remote_tools(server: MCPServer) -> None:
     ) -> Dict[str, Any]:
         """Propose a purchase on behalf of the authenticated customer."""
         return propose_purchase_remote_handler(
-            product_id=product_id,
+            product_id=product_id.strip(),
             quantity=quantity,
         )
 
