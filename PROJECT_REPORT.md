@@ -155,7 +155,7 @@ Exposed directly to AI agents via `python -m app.mcp.server` and remote HTTP `/m
 - **Agent Purchasing**: `POST /agent/purchase` (Auth Protected), `POST /agent/confirm` (Auth Protected)
 - **Payment Rails & Webhooks**: `POST /payment/webhook` (HMAC-SHA256 signature verification), `POST /payment/verify`
 - **Merchant Intelligence**: `POST /merchant/inquire`, `POST /merchant/recommend-addons`
-- **Audit Ledger**: `GET /audit`, `GET /audit/{tx_id}`, `GET /audit/verify` (Cryptographic integrity check)
+- **Audit Ledger**: `GET /audit`, `GET /audit/{tx_id}`, `GET /audit/verify` (Cryptographic integrity check), `GET /audit/anchor` (Exportable root checkpoint & SHA-256 state digest)
 - **Admin Management**: `GET /admin/customers`, `POST /admin/customers`, `PATCH /admin/customers/{id}/mandate`
 - **OAuth 2.1**: `GET /oauth/authorize`, `POST /oauth/authorize`, `POST /oauth/token`, `GET /.well-known/oauth-authorization-server`, `GET /.well-known/oauth-protected-resource`
 - **Dashboard UI**: `GET /admin/dashboard`, `GET /admin`
@@ -164,21 +164,21 @@ Exposed directly to AI agents via `python -m app.mcp.server` and remote HTTP `/m
 
 ## 🧪 Verification & Test Suite Health
 
-The gateway includes an extensive automated test suite with **155 passed tests (100% pass rate)**:
+The gateway includes an extensive automated test suite with **159 passed tests (100% pass rate)**:
 
 ```
-============================== 155 passed in 105s ==============================
+============================== 159 passed in 68s ==============================
 - tests/test_policy_engine.py          : 23 passed (Boundary limits, expiry, category whitelists, daily caps)
-- tests/test_payments.py               : 20 passed (Razorpay orders, webhooks, deduplication, stock restore)
-- tests/test_audit.py                  : 13 passed (Immutable SQLite logging, append-only hash chaining, verify)
+- tests/test_payments.py               : 21 passed (Razorpay orders, webhooks, persistent DB dedup, stock restore)
+- tests/test_audit.py                  : 14 passed (Immutable SQLite/Postgres logging, hash chaining, GET /audit/anchor)
 - tests/test_oauth.py                  : 17 passed (JWT tokens, PBKDF2 hashing, refresh grants, sub claims)
 - tests/test_merchant_agent.py         : 11 passed (Gemini LLM reasoning, quote grounding, add-on recommendations)
 - tests/test_mcp.py                    : 24 passed (Local STDIO tools, confirmation gating, idempotency)
 - tests/test_mcp_remote.py             : 8 passed  (Streamable HTTP, auth headers, token isolation)
-- tests/test_agent_router.py           : 14 passed (Auth-protected purchasing, confirmation tokens, error mapping)
+- tests/test_agent_router.py           : 16 passed (Auth-protected purchasing, confirmation tokens, token replay immunity, policy re-evaluation)
 - tests/test_admin.py                  : 10 passed (Mandate updates, customer provisioning, admin security)
 - tests/test_dashboard.py              : 3 passed  (HTML dashboard, static CSS/JS serving)
-- tests/test_catalog.py                : 10 passed (Product filtering, multi-token search, stock management)
+- tests/test_catalog.py                : 10 passed (Product filtering, multi-token search, 47-product catalog)
 - tests/test_google_oauth_and_signup.py: 2 passed  (Google login redirect & auto-provisioning)
 ```
 

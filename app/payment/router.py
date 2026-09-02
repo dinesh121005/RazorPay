@@ -112,7 +112,7 @@ async def razorpay_webhook(
     notes = entity.get("notes", {})
     transaction_id = notes.get("transaction_id")
 
-    # 3. Deduplication Check (Idempotency Guard)
+    # 3. Persistent Deduplication Check (Database Idempotency Guard)
     event_id = (
         x_razorpay_event_id
         or data.get("event_id")
@@ -120,7 +120,7 @@ async def razorpay_webhook(
         or f"{event}:{order_id}:{entity.get('id', '')}"
     )
 
-    if event_id in _processed_webhook_event_ids:
+    if audit_store.is_webhook_processed(event_id) or event_id in _processed_webhook_event_ids:
         logger.info("Duplicate webhook event %s received — returning deduplicated 200 OK", event_id)
         return {
             "status": "ok",
@@ -130,6 +130,8 @@ async def razorpay_webhook(
             "deduplicated": True,
         }
 
+    # Persist in DB and memory
+    audit_store.record_webhook_event(event_id)
     _processed_webhook_event_ids.add(event_id)
     logger.info("Received and processing Razorpay webhook event: %s (id: %s) for order: %s", event, event_id, order_id)
 

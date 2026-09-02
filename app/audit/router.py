@@ -60,6 +60,19 @@ def verify_audit_ledger() -> dict:
 
 
 @router.get(
+    "/anchor",
+    status_code=status.HTTP_200_OK,
+    summary="Cryptographic Ledger Anchor State",
+    description="Returns the exportable cryptographic root checkpoint, block height, genesis hash, and SHA-256 state digest."
+)
+def get_audit_ledger_anchor() -> dict:
+    """
+    Returns the cryptographic anchor and root hash digest for external transparency verification.
+    """
+    return audit_store.get_ledger_anchor()
+
+
+@router.get(
     "/{transaction_id}",
     response_model=AuditRecord,
     status_code=status.HTTP_200_OK,

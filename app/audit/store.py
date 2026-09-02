@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import hashlib
 import os
 import sqlite3
+import time
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from app.audit.models import AuditRecord
@@ -139,6 +140,16 @@ class AuditStore:
             )
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_audit_events_tx ON audit_events(transaction_id);"
+            )
+
+            # Persistent Webhook Event Deduplication Ledger
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS processed_webhook_events (
+                    event_id TEXT PRIMARY KEY,
+                    received_at REAL NOT NULL
+                );
+                """
             )
             conn.commit()
 
@@ -558,6 +569,69 @@ class AuditStore:
                 prev_hash=row[12] if len(row) > 12 else "GENESIS",
                 record_hash=row[13] if len(row) > 13 else None,
             )
+
+    def is_webhook_processed(self, event_id: str) -> bool:
+        """Checks if a Razorpay webhook event has already been processed (persistent deduplication)."""
+        if not event_id or not event_id.strip():
+            return False
+        self._ensure_db_initialized()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT 1 FROM processed_webhook_events WHERE event_id = ?;",
+                (event_id.strip(),),
+            )
+            return cursor.fetchone() is not None
+
+    def record_webhook_event(self, event_id: str) -> None:
+        """Persists a processed webhook event ID into the database."""
+        if not event_id or not event_id.strip():
+            return
+        self._ensure_db_initialized()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR IGNORE INTO processed_webhook_events (event_id, received_at) VALUES (?, ?);",
+                (event_id.strip(), time.time()),
+            )
+            conn.commit()
+
+    def get_ledger_anchor(self) -> Dict[str, Any]:
+        """
+        Computes an exportable cryptographic checkpoint anchor of the audit ledger.
+        Returns block height, root hash, genesis hash, timestamp, and signed state digest.
+        """
+        self._ensure_db_initialized()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM audit_events;")
+            row = cursor.fetchone()
+            total_events = row[0] if row else 0
+            genesis_time = row[1] if (row and row[1]) else None
+            latest_time = row[2] if (row and row[2]) else None
+
+            cursor.execute("SELECT event_hash FROM audit_events ORDER BY id DESC LIMIT 1;")
+            latest_row = cursor.fetchone()
+            root_hash = latest_row[0] if latest_row else "GENESIS"
+
+            cursor.execute("SELECT event_hash FROM audit_events ORDER BY id ASC LIMIT 1;")
+            first_row = cursor.fetchone()
+            genesis_event_hash = first_row[0] if first_row else "GENESIS"
+
+            # Compute SHA-256 state digest over root hash, height, and genesis
+            anchor_payload = f"{root_hash}|{total_events}|{genesis_event_hash}|{latest_time or ''}"
+            anchor_digest = hashlib.sha256(anchor_payload.encode("utf-8")).hexdigest()
+
+            return {
+                "ledger_status": "tamper_evident_anchored",
+                "root_event_hash": root_hash,
+                "total_event_blocks": total_events,
+                "genesis_event_hash": genesis_event_hash,
+                "genesis_timestamp": genesis_time,
+                "latest_event_timestamp": latest_time,
+                "anchor_digest_sha256": anchor_digest,
+                "anchored_at": datetime.now(timezone.utc).isoformat(),
+            }
 
 
 # Default module-level singleton instance

@@ -285,3 +285,18 @@ def test_verify_audit_ledger_endpoint(admin_headers):
     assert data["valid"] is True
     assert "total_records" in data
 
+
+def test_audit_ledger_anchor_endpoint(admin_headers):
+    """
+    GET /audit/anchor returns the exportable cryptographic checkpoint and root hash.
+    """
+    response = client.get("/audit/anchor", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ledger_status"] == "tamper_evident_anchored"
+    assert "root_event_hash" in data
+    assert "total_event_blocks" in data
+    assert "anchor_digest_sha256" in data
+    assert "anchored_at" in data
+
+

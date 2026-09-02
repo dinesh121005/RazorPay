@@ -8,9 +8,13 @@ by default — run it manually with real Test Mode keys to verify pre-demo.
 
 Mock target: `app.payment.razorpay_client.create_order`
 """
+import hashlib
+import hmac
+import json
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
+from app.audit import audit_store
 from app.main import app
 from app.payment.service import _rupees_to_paise, create_order_for_approved
 
@@ -512,5 +516,46 @@ def test_webhook_payment_failed_restores_inventory():
     # Audit status must be failed
     record = audit_store.get("txn-fail-restore-001")
     assert record.payment_status == "failed"
+
+
+def test_persistent_database_webhook_deduplication():
+    """
+    Verifies that webhook event deduplication is persisted in the database,
+    returning 200 OK with deduplicated: True even across fresh memory state.
+    """
+    secret = "dev-webhook-secret"
+    event_id = "evt_persistent_dedup_999"
+
+    # Pre-record event in audit store
+    audit_store.record_webhook_event(event_id)
+    assert audit_store.is_webhook_processed(event_id) is True
+
+    payload_dict = {
+        "event_id": event_id,
+        "event": "payment.captured",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_Persistent999",
+                    "order_id": "order_Persistent999",
+                    "amount": 10000,
+                    "status": "captured",
+                }
+            }
+        }
+    }
+    body_bytes = json.dumps(payload_dict).encode("utf-8")
+    sig = hmac.new(secret.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+
+    resp = client.post(
+        "/payment/webhook",
+        content=body_bytes,
+        headers={"X-Razorpay-Signature": sig, "Content-Type": "application/json", "X-Razorpay-Event-Id": event_id},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["deduplicated"] is True
+    assert data["processed"] is True
+
 
 

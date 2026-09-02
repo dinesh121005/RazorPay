@@ -335,11 +335,13 @@ def confirm_purchase(
     Executes a previously proposed, gated purchase using the signed confirmation token:
     1. Decodes and verifies the confirmation token (checks signature & 5-minute expiry).
     2. Validates identity matches token 'sub' claim if customer_id is provided.
-    3. Re-verifies catalog inventory stock availability.
-    4. Creates Razorpay Test Mode order.
-    5. Decrements inventory stock.
-    6. Updates audit record from PENDING_CONFIRMATION to APPROVED and logs payment outcome.
-    7. Returns shaped PurchaseResponse with confirmed reference code.
+    3. Idempotency & Replay Guard: Checks if transaction_id has already been confirmed/finalized.
+    4. Re-verifies catalog inventory stock availability.
+    5. Re-evaluates deterministic policy engine mandate rules at confirmation time.
+    6. Creates Razorpay Test Mode order.
+    7. Decrements inventory stock.
+    8. Updates audit record from PENDING_CONFIRMATION to APPROVED and logs payment outcome.
+    9. Returns shaped PurchaseResponse with confirmed reference code.
     """
     try:
         payload = decode_confirmation_token(confirmation_token)
@@ -360,7 +362,15 @@ def confirm_purchase(
     transaction_id = payload["transaction_id"]
     idempotency_key = payload.get("idempotency_key")
 
-    # Re-verify stock
+    # 1. Idempotency & Replay Guard: Check if transaction has already been finalized
+    existing_record = audit_store.get(transaction_id)
+    if existing_record is not None and (
+        existing_record.decision == "APPROVED"
+        or existing_record.payment_status in ("created", "captured")
+    ):
+        return _build_replayed_response(existing_record)
+
+    # 2. Re-verify stock
     product = get_product(product_id)
     if product.stock < quantity:
         raise InsufficientStockError(
@@ -369,10 +379,27 @@ def confirm_purchase(
             available=product.stock,
         )
 
+    # 3. Mandate Lookup & Deterministic Policy Re-Evaluation at Confirmation Time
     mandate = mandate_store.get_mandate(token_customer_id)
-    limit = mandate.max_transaction_amount if mandate else amount
+    if mandate is None:
+        raise MandateNotFoundError(token_customer_id)
 
-    # Execute Razorpay payment order
+    current_daily_spend = audit_store.get_daily_spend(token_customer_id)
+    purchase_request = PurchaseRequest(
+        customer_id=token_customer_id,
+        product_id=product.id,
+        category=product.category,
+        amount=amount,
+        merchant=product.merchant_id,
+        quantity=quantity,
+    )
+    decision = evaluate(purchase_request, mandate, current_daily_spend=current_daily_spend)
+    if decision.status != "APPROVED":
+        raise InvalidPurchaseError(f"Policy evaluation rejected purchase at confirmation time: {decision.reason}")
+
+    limit = mandate.max_transaction_amount
+
+    # 4. Execute Razorpay payment order
     payment_result = create_order_for_approved(
         amount_inr=amount,
         receipt=transaction_id,
@@ -389,7 +416,7 @@ def confirm_purchase(
         # Decrement real stock
         decrement_stock(product.id, quantity)
 
-    # Update audit record to final approved state
+    # 5. Update audit record to final approved state
     audit_store.update_payment_outcome(
         transaction_id=transaction_id,
         payment_status=payment_result.status,

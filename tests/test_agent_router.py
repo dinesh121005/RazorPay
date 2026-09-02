@@ -330,3 +330,91 @@ def test_recommend_addons_endpoint():
         assert addon["price_per_unit"] <= 1000.0
 
 
+def test_confirmation_token_replay_is_idempotent():
+    """
+    Verifies that calling /agent/confirm with the same valid confirmation token multiple times
+    is idempotent: it returns the existing confirmed transaction and does NOT call Razorpay twice.
+    """
+    # 1. Propose purchase for KB001 (₹1,499 >= ₹500 gating threshold)
+    propose_resp = client.post(
+        "/agent/purchase",
+        json={"customer_id": "CUST001", "product_id": "KB001", "quantity": 1},
+        headers=_ADMIN_HEADERS,
+    )
+    assert propose_resp.status_code == 200
+    propose_data = propose_resp.json()
+    assert propose_data["requires_confirmation"] is True
+    token = propose_data["confirmation_token"]
+    assert token is not None
+
+    # 2. First confirmation call: mints Razorpay order
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
+        confirm_resp1 = client.post(
+            "/agent/confirm",
+            json={"confirmation_token": token, "customer_id": "CUST001"},
+            headers=_ADMIN_HEADERS,
+        )
+    mock_create.assert_called_once()
+    assert confirm_resp1.status_code == 200
+    data1 = confirm_resp1.json()
+    assert data1["decision"] == "APPROVED"
+    assert data1["transaction_id"] is not None
+
+    # 3. Second confirmation call with the SAME token (replay attack / duplicate network call)
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create_replay:
+        confirm_resp2 = client.post(
+            "/agent/confirm",
+            json={"confirmation_token": token, "customer_id": "CUST001"},
+            headers=_ADMIN_HEADERS,
+        )
+    # Must NOT call Razorpay again
+    mock_create_replay.assert_not_called()
+    assert confirm_resp2.status_code == 200
+    data2 = confirm_resp2.json()
+    assert data2["decision"] == "APPROVED"
+    assert data2["transaction_id"] == data1["transaction_id"]
+
+
+def test_confirmation_policy_re_evaluation_rejects_if_mandate_revoked():
+    """
+    Verifies that if a mandate is updated/revoked between proposal and confirmation,
+    the confirmation is rejected before payment execution.
+    """
+    from app.policy.store import mandate_store
+
+    # 1. Propose purchase for KB001 (₹1,499)
+    propose_resp = client.post(
+        "/agent/purchase",
+        json={"customer_id": "CUST001", "product_id": "KB001", "quantity": 1},
+        headers=_ADMIN_HEADERS,
+    )
+    assert propose_resp.status_code == 200
+    token = propose_resp.json()["confirmation_token"]
+
+    # 2. Lower customer mandate limit to ₹1,000 (below ₹1,499) before confirmation
+    orig_mandate = mandate_store.get_mandate("CUST001")
+    orig_limit = orig_mandate.max_transaction_amount
+    mandate_store.update_mandate_limit(
+        customer_id="CUST001",
+        new_limit=1000.0,
+    )
+
+    try:
+        with patch(_CREATE_ORDER, return_value=_FAKE_ORDER) as mock_create:
+            confirm_resp = client.post(
+                "/agent/confirm",
+                json={"confirmation_token": token, "customer_id": "CUST001"},
+                headers=_ADMIN_HEADERS,
+            )
+        mock_create.assert_not_called()
+        assert confirm_resp.status_code == 422
+        assert "Policy evaluation rejected" in confirm_resp.json()["detail"]
+    finally:
+        # Restore original mandate limit
+        mandate_store.update_mandate_limit(
+            customer_id="CUST001",
+            new_limit=orig_limit,
+        )
+
+
+
