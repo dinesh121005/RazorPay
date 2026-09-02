@@ -300,7 +300,7 @@ class AdminDashboard {
     const currentVal = this.sandboxCustomerSelect.value;
     this.sandboxCustomerSelect.innerHTML = this.mandates
       .map((m) => {
-        const lim = (m.mandate_limit || 0).toLocaleString("en-IN");
+        const lim = (m.max_transaction_amount ?? m.mandate_limit ?? 0).toLocaleString("en-IN");
         return `<option value="${m.customer_id}">${m.customer_id} — ${m.display_name} (₹${lim} limit)</option>`;
       })
       .join("");
@@ -436,7 +436,8 @@ class AdminDashboard {
           ? m.allowed_merchants.map((mech) => `<span class="mono text-xs">${mech}</span>`).join(", ")
           : "—";
         const exp = m.expires_at ? new Date(m.expires_at).toLocaleDateString() : "Never";
-        const lim = (Number(m.mandate_limit) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        const rawLimit = Number(m.max_transaction_amount ?? m.mandate_limit) || 0;
+        const lim = rawLimit.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
         return `
           <tr>
@@ -448,7 +449,7 @@ class AdminDashboard {
             <td>${merches}</td>
             <td class="text-xs text-muted">${exp}</td>
             <td>
-              <button class="btn btn-secondary btn-sm" onclick="dashboard.openEditMandateModal('${m.customer_id}', '${m.display_name}', ${m.mandate_limit})">
+              <button class="btn btn-secondary btn-sm" onclick="dashboard.openEditMandateModal('${m.customer_id}', '${m.display_name}', ${rawLimit})">
                 Edit Limit
               </button>
             </td>

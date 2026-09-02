@@ -506,8 +506,8 @@ def provision_new_customer(
             customer_id=customer_id,
             display_name=display_name,
             mandate_limit=initial_budget,
-            allowed_categories=["electronics", "apparel", "food", "accessories", "office"],
-            allowed_merchants=["MERCH_TECH_DIRECT", "MERCH_FASHION_HUB", "MERCH_GOURMET", "MERCH_OFFICE_DEPOT"],
+            allowed_categories=["electronics", "home_kitchen", "apparel", "food"],
+            allowed_merchants=["MERCH_ELEC", "MERCH_FOOD"],
             email=clean_email or f"{clean_username}@example.com",
         )
     except Exception as e:
