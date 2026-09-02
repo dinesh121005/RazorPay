@@ -1,9 +1,9 @@
-"""
-OAuth 2.1 minimal authorization server endpoints, discovery metadata, and token grants.
-"""
+import base64
+import json
 from typing import Optional
 from urllib.parse import urlencode
 
+import httpx
 from fastapi import APIRouter, Form, Header, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
@@ -11,11 +11,15 @@ from app.oauth.crypto import create_access_token
 from app.oauth.models import TokenRequest, TokenResponse
 from app.oauth.store import (
     ALLOWED_REDIRECT_URIS,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI,
     OAUTH_CLIENT_ID,
     OAUTH_CLIENT_SECRET,
     auth_code_store,
     customer_auth_store,
     is_allowed_redirect_uri,
+    provision_new_customer,
 )
 
 router = APIRouter(tags=["oauth"])
@@ -29,7 +33,6 @@ def _validate_client_credentials(
     """Validates client_id and client_secret from body or Authorization: Basic header."""
     # Check Basic Auth header
     if auth_header and auth_header.startswith("Basic "):
-        import base64
         try:
             decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
             h_client_id, h_client_secret = decoded.split(":", 1)
@@ -80,13 +83,13 @@ def get_oauth_protected_resource_metadata(request: Request) -> dict:
 
 
 # -----------------------------------------------------------------------------
-# Authorization & Login Endpoints
+# Authorization, Registration & SSO Endpoints
 # -----------------------------------------------------------------------------
 @router.get(
     "/oauth/authorize",
     response_class=HTMLResponse,
     summary="OAuth 2.1 Authorization Form",
-    description="Renders the customer authorization login form."
+    description="Renders the customer authorization login and registration form."
 )
 def get_authorize_page(
     response_type: str = Query(default="code"),
@@ -95,7 +98,7 @@ def get_authorize_page(
     state: Optional[str] = Query(default=None),
     scope: Optional[str] = Query(default="purchase"),
 ):
-    """Renders HTML login form for customer authentication."""
+    """Renders HTML login & sign-up form with Google SSO for customer authentication."""
     if response_type != "code":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -112,48 +115,537 @@ def get_authorize_page(
             detail=f"Unauthorized redirect_uri: '{redirect_uri}'."
         )
 
+    google_login_params = urlencode({
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "state": state or "",
+        "scope": scope or "purchase",
+    })
+    google_login_url = f"/oauth/google/login?{google_login_params}"
+
     html_content = f"""<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Agentic Gateway — Customer Authorization</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authorize AI Shopping Agent — Agentic Gateway</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
-        .card {{ background: #1e293b; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 360px; }}
-        h2 {{ margin-top: 0; color: #38bdf8; font-size: 1.4rem; }}
-        p {{ color: #94a3b8; font-size: 0.9rem; }}
-        label {{ display: block; margin-top: 1rem; color: #cbd5e1; font-size: 0.85rem; }}
-        input {{ width: 100%; padding: 0.6rem; margin-top: 0.3rem; border: 1px solid #334155; border-radius: 6px; background: #0f172a; color: #f8fafc; box-sizing: border-box; }}
-        button {{ width: 100%; padding: 0.75rem; margin-top: 1.5rem; background: #3b82f6; border: none; border-radius: 6px; color: white; font-weight: 600; cursor: pointer; }}
-        button:hover {{ background: #2563eb; }}
-        .demo-note {{ margin-top: 1rem; padding: 0.6rem; background: #334155; border-radius: 6px; font-size: 0.8rem; color: #94a3b8; }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #111827 100%);
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }}
+        .card {{
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(56, 189, 248, 0.06);
+            width: 100%;
+            max-width: 420px;
+            padding: 2.2rem;
+            animation: fadeIn 0.3s ease-out;
+        }}
+        @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+        .header {{ text-align: center; margin-bottom: 1.6rem; }}
+        .logo-badge {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #0284c7, #3b82f6);
+            margin-bottom: 0.8rem;
+            box-shadow: 0 8px 16px rgba(2, 132, 199, 0.3);
+        }}
+        h2 {{ color: #f8fafc; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }}
+        .subtitle {{ color: #94a3b8; font-size: 0.88rem; margin-top: 0.3rem; line-height: 1.4; }}
+        
+        .btn-google {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: #ffffff;
+            color: #1f2937;
+            font-size: 0.92rem;
+            font-weight: 600;
+            border-radius: 10px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin-bottom: 1.4rem;
+        }}
+        .btn-google:hover {{
+            background: #f1f5f9;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+        }}
+        
+        .divider {{
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 1.2rem 0;
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+        .divider::before, .divider::after {{
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #334155;
+        }}
+        .divider span {{ padding: 0 0.8rem; }}
+        
+        .tabs {{
+            display: flex;
+            background: #0f172a;
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 1.4rem;
+            border: 1px solid #334155;
+        }}
+        .tab-btn {{
+            flex: 1;
+            padding: 0.5rem;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }}
+        .tab-btn.active {{
+            background: #3b82f6;
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+        }}
+        
+        .form-group {{ margin-bottom: 1rem; }}
+        label {{ display: block; margin-bottom: 0.35rem; color: #cbd5e1; font-size: 0.82rem; font-weight: 500; }}
+        input[type="text"], input[type="email"], input[type="password"] {{
+            width: 100%;
+            padding: 0.65rem 0.85rem;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            background: #0f172a;
+            color: #f8fafc;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }}
+        input:focus {{
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        }}
+        
+        .btn-submit {{
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            border: none;
+            border-radius: 9px;
+            color: white;
+            font-size: 0.92rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+            margin-top: 0.5rem;
+        }}
+        .btn-submit:hover {{
+            background: linear-gradient(135deg, #0369a1, #1d4ed8);
+            transform: translateY(-1px);
+        }}
+        
+        .info-pill {{
+            margin-top: 1.2rem;
+            padding: 0.7rem 0.9rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px dashed #334155;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            color: #94a3b8;
+            line-height: 1.4;
+        }}
+        .info-pill strong {{ color: #e2e8f0; }}
+        .badge-mandate {{ color: #38bdf8; font-weight: 600; }}
     </style>
 </head>
 <body>
     <div class="card">
-        <h2>Authorize AI Shopping Agent</h2>
-        <p>Log in with your customer account to authorize Claude to propose purchases within your mandate.</p>
-        <form method="POST" action="/oauth/authorize">
+        <div class="header">
+            <div class="logo-badge">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+            </div>
+            <h2>Authorize AI Shopping Agent</h2>
+            <p class="subtitle">Connect Claude to transact securely under your bounded spending mandate.</p>
+        </div>
+
+        <!-- Google OAuth SSO Button -->
+        <a href="{google_login_url}" class="btn-google">
+            <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.35 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            Continue with Google
+        </a>
+
+        <div class="divider"><span>or with credentials</span></div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button type="button" class="tab-btn active" id="tab-login" onclick="switchTab('login')">Sign In</button>
+            <button type="button" class="tab-btn" id="tab-signup" onclick="switchTab('signup')">Create Account</button>
+        </div>
+
+        <!-- Sign In Form -->
+        <form id="form-login" method="POST" action="/oauth/authorize">
             <input type="hidden" name="client_id" value="{client_id}">
             <input type="hidden" name="redirect_uri" value="{redirect_uri}">
             <input type="hidden" name="response_type" value="{response_type}">
             <input type="hidden" name="state" value="{state or ''}">
             <input type="hidden" name="scope" value="{scope or 'purchase'}">
-            
-            <label>Username / Email</label>
-            <input type="text" name="username" placeholder="e.g. dinesh or dinesh@example.com" required autofocus>
-            
-            <label>Password</label>
-            <input type="password" name="password" placeholder="••••••••" required>
-            
-            <button type="submit">Authorize Access</button>
+
+            <div class="form-group">
+                <label>Username or Email</label>
+                <input type="text" name="username" placeholder="dinesh or dinesh@example.com" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-submit">Authorize Access</button>
         </form>
-        <div class="demo-note">
-            Demo credentials: <strong>dinesh</strong> / <strong>password123</strong> (CUST001) or <strong>alex</strong> / <strong>password123</strong> (CUST002)
+
+        <!-- Sign Up / Register Form -->
+        <form id="form-signup" method="POST" action="/oauth/register" style="display: none;">
+            <input type="hidden" name="client_id" value="{client_id}">
+            <input type="hidden" name="redirect_uri" value="{redirect_uri}">
+            <input type="hidden" name="response_type" value="{response_type}">
+            <input type="hidden" name="state" value="{state or ''}">
+            <input type="hidden" name="scope" value="{scope or 'purchase'}">
+
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" name="display_name" placeholder="John Doe" required>
+            </div>
+
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" placeholder="johndoe" required>
+            </div>
+
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" name="email" placeholder="john@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-submit">Create Account & Authorize</button>
+        </form>
+
+        <div class="info-pill" id="login-demo-pill">
+            Demo Credentials: <strong>dinesh</strong> / <strong>password123</strong> (CUST001) or <strong>alex</strong> / <strong>password123</strong> (CUST002).
+        </div>
+        <div class="info-pill" id="signup-info-pill" style="display: none;">
+            ✨ New accounts are automatically provisioned with a <span class="badge-mandate">₹2,000.00</span> spending mandate.
         </div>
     </div>
+
+    <script>
+        function switchTab(tab) {{
+            const loginBtn = document.getElementById('tab-login');
+            const signupBtn = document.getElementById('tab-signup');
+            const loginForm = document.getElementById('form-login');
+            const signupForm = document.getElementById('form-signup');
+            const loginPill = document.getElementById('login-demo-pill');
+            const signupPill = document.getElementById('signup-info-pill');
+
+            if (tab === 'login') {{
+                loginBtn.classList.add('active');
+                signupBtn.classList.remove('active');
+                loginForm.style.display = 'block';
+                signupForm.style.display = 'none';
+                loginPill.style.display = 'block';
+                signupPill.style.display = 'none';
+            }} else {{
+                signupBtn.classList.add('active');
+                loginBtn.classList.remove('active');
+                signupForm.style.display = 'block';
+                loginForm.style.display = 'none';
+                signupPill.style.display = 'block';
+                loginPill.style.display = 'none';
+            }}
+        }}
+    </script>
 </body>
 </html>"""
     return HTMLResponse(content=html_content)
+
+
+@router.get(
+    "/oauth/google/login",
+    summary="Initiate Google OAuth 2.0 SSO",
+    description="Redirects user to Google OAuth 2.0 authorization page while preserving original MCP client state."
+)
+def google_login(
+    client_id: str = Query(...),
+    redirect_uri: str = Query(...),
+    state: Optional[str] = Query(default=None),
+    scope: Optional[str] = Query(default="purchase"),
+):
+    """Generates Google OAuth URL and redirects browser to Google Sign-In."""
+    if client_id != OAUTH_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid client_id."
+        )
+    if not is_allowed_redirect_uri(redirect_uri):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unauthorized redirect_uri: '{redirect_uri}'."
+        )
+
+    # Pack client state into JSON base64 string
+    state_payload = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "scope": scope or "purchase",
+    }
+    encoded_state = base64.urlsafe_b64encode(json.dumps(state_payload).encode("utf-8")).decode("utf-8")
+
+    google_params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": encoded_state,
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    google_auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(google_params)}"
+    return RedirectResponse(url=google_auth_url, status_code=status.HTTP_302_FOUND)
+
+
+@router.get(
+    "/oauth/google/callback",
+    summary="Handle Google OAuth 2.0 Callback",
+    description="Exchanges Google auth code for profile, auto-provisions or resolves customer, and redirects to MCP client."
+)
+async def google_callback(
+    code: Optional[str] = Query(default=None),
+    state: Optional[str] = Query(default=None),
+    error: Optional[str] = Query(default=None),
+):
+    """Processes callback from Google OAuth, logs in / registers customer, and returns Gateway authorization code."""
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Google authentication error: {error}"
+        )
+    if not code or not state:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing authorization code or state from Google."
+        )
+
+    # Unpack state
+    try:
+        decoded_state_json = base64.urlsafe_b64decode(state.encode("utf-8")).decode("utf-8")
+        state_data = json.loads(decoded_state_json)
+        client_id = state_data["client_id"]
+        redirect_uri = state_data["redirect_uri"]
+        client_state = state_data.get("state")
+        client_scope = state_data.get("scope", "purchase")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or malformed state parameter."
+        )
+
+    # Exchange code for Google ID token / access token
+    async with httpx.AsyncClient() as http_client:
+        token_res = await http_client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": GOOGLE_REDIRECT_URI,
+                "grant_type": "authorization_code",
+            },
+            headers={"Accept": "application/json"},
+            timeout=15.0,
+        )
+        if token_res.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to exchange token with Google: {token_res.text}"
+            )
+
+        token_json = token_res.json()
+        google_access_token = token_json.get("access_token")
+        if not google_access_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No access token returned by Google."
+            )
+
+        # Fetch Google user profile
+        userinfo_res = await http_client.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {google_access_token}"},
+            timeout=15.0,
+        )
+        if userinfo_res.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to fetch Google user profile."
+            )
+
+        userinfo = userinfo_res.json()
+        email = userinfo.get("email")
+        name = userinfo.get("name") or (email.split("@")[0] if email else "Google User")
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google profile did not provide an email address."
+        )
+
+    # Check if customer already exists, otherwise auto-provision
+    existing_user = customer_auth_store.get_user_by_email(email)
+    if existing_user:
+        customer_id = existing_user.customer_id
+    else:
+        customer_id, _ = provision_new_customer(
+            display_name=name,
+            email=email,
+            initial_budget=2000.0,
+        )
+
+    # Issue gateway authorization code
+    auth_code = auth_code_store.issue_code(
+        customer_id=customer_id,
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        scope=client_scope or "purchase",
+    )
+
+    query_params = {"code": auth_code}
+    if client_state:
+        query_params["state"] = client_state
+
+    target_url = f"{redirect_uri}?{urlencode(query_params)}"
+    return RedirectResponse(url=target_url, status_code=status.HTTP_302_FOUND)
+
+
+@router.post(
+    "/oauth/register",
+    summary="Self-service customer registration and authorization",
+    description="Registers a new customer account, provisions a default spending mandate, and issues an authorization code."
+)
+async def post_register(
+    request: Request,
+    display_name: str = Form(...),
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    client_id: str = Form(...),
+    redirect_uri: str = Form(...),
+    response_type: Optional[str] = Form(default="code"),
+    state: Optional[str] = Form(default=None),
+    scope: Optional[str] = Form(default="purchase"),
+):
+    """Processes self-service registration and returns redirect with authorization code."""
+    if client_id != OAUTH_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid client_id."
+        )
+    if not is_allowed_redirect_uri(redirect_uri):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unauthorized redirect_uri: '{redirect_uri}'."
+        )
+
+    clean_user = username.strip().lower()
+    clean_email = email.strip().lower()
+
+    if customer_auth_store.get_user_by_username(clean_user) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Username '{clean_user}' is already taken."
+        )
+    if customer_auth_store.get_user_by_email(clean_email) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Email '{clean_email}' is already registered."
+        )
+
+    try:
+        customer_id, _ = provision_new_customer(
+            display_name=display_name.strip(),
+            username=clean_user,
+            email=clean_email,
+            password=password,
+            initial_budget=2000.0,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+    code = auth_code_store.issue_code(
+        customer_id=customer_id,
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        scope=scope or "purchase",
+    )
+
+    query_params = {"code": code}
+    if state:
+        query_params["state"] = state
+
+    target_url = f"{redirect_uri}?{urlencode(query_params)}"
+    if request.headers.get("accept", "").startswith("application/json"):
+        return JSONResponse(content={
+            "redirect_uri": target_url,
+            "code": code,
+            "state": state,
+            "customer_id": customer_id
+        })
+
+    return RedirectResponse(url=target_url, status_code=status.HTTP_302_FOUND)
 
 
 @router.post(

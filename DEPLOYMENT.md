@@ -42,7 +42,11 @@ Set the following environment variables in your deployment dashboard (or `.env` 
 | `JWT_SECRET` | **Yes** | `dev-oauth-jwt-secret-key-32chars` | Secret key used to sign and verify OAuth access tokens. |
 | `OAUTH_CLIENT_ID` | Optional | `claude-desktop-client` | Pre-registered OAuth client ID for AI connector. |
 | `OAUTH_CLIENT_SECRET` | Optional | `claude-demo-secret` | Pre-registered OAuth client secret for token exchange. |
+| `GOOGLE_CLIENT_ID` | Optional | `your_google_client_id.apps.googleusercontent.com` | Google OAuth 2.0 Web Client ID for SSO. |
+| `GOOGLE_CLIENT_SECRET` | Optional | `GOCSPX-xxxxxxxxxxxxxxxxxxxx` | Google OAuth 2.0 Client Secret. |
+| `GOOGLE_REDIRECT_URI` | Optional | `https://your-app.onrender.com/oauth/google/callback` | Authorized Google OAuth redirect URI. |
 | `DATABASE_URL` | Optional | `gateway.db` | Path or connection URL for the audit database. |
+
 
 ---
 

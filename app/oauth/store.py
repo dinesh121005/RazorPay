@@ -17,6 +17,14 @@ from app.oauth.models import CustomerCredentials
 OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID", "claude-desktop-client")
 OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET", "claude-demo-secret")
 
+# Google OAuth SSO Configuration
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI",
+    "https://razorpay-c454.onrender.com/oauth/google/callback",
+)
+
 ALLOWED_REDIRECT_URIS: Set[str] = {
     "https://claude.ai/api/mcp/oauth_callback",
     "https://claude.ai/api/mcp/oauth/callback",
@@ -320,6 +328,26 @@ class CustomerAuthStore:
             salt=row[4],
         )
 
+    def get_user_by_email(self, email: str) -> Optional[CustomerCredentials]:
+        """Fetch user credentials by email address."""
+        self._ensure_db_initialized()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT customer_id, username, email, password_hash, salt FROM customer_credentials WHERE LOWER(email) = ?",
+                (email.strip().lower(),),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return CustomerCredentials(
+            customer_id=row[0],
+            username=row[1],
+            email=row[2],
+            password_hash=row[3],
+            salt=row[4],
+        )
+
     def delete_user(self, customer_id: str) -> bool:
         """Deletes credentials for a customer (e.g. for atomic rollback)."""
         self._ensure_db_initialized()
@@ -426,3 +454,65 @@ class CustomerAuthStore:
 # Singleton instances
 auth_code_store = AuthorizationCodeStore()
 customer_auth_store = CustomerAuthStore()
+
+
+def provision_new_customer(
+    display_name: str,
+    username: Optional[str] = None,
+    email: Optional[str] = None,
+    password: Optional[str] = None,
+    initial_budget: float = 2000.0,
+) -> Tuple[str, CustomerCredentials]:
+    """
+    Provisions a new customer account in both customer_auth_store and mandate_store.
+    Returns (customer_id, CustomerCredentials).
+    """
+    import uuid
+    from app.policy.store import mandate_store
+
+    clean_email = email.strip().lower() if email else None
+
+    # Generate unique customer_id with random hex suffix
+    suffix = uuid.uuid4().hex[:6].upper()
+    customer_id = f"CUST_{suffix}"
+
+    # Generate unique username
+    if not username:
+        if clean_email:
+            base_user = clean_email.split("@")[0]
+        else:
+            base_user = display_name.lower().replace(" ", "")
+        username = base_user
+    clean_username = username.strip().lower()
+
+    # Ensure username is unique
+    existing = customer_auth_store.get_user_by_username(clean_username)
+    if existing:
+        clean_username = f"{clean_username}_{suffix[:4].lower()}"
+
+    pw = password or secrets.token_urlsafe(16)
+
+    # Register in auth store
+    creds = customer_auth_store.register_user(
+        customer_id=customer_id,
+        username=clean_username,
+        email=clean_email or f"{clean_username}@example.com",
+        password=pw,
+    )
+
+    # Create standard mandate in policy store
+    try:
+        mandate_store.create_mandate(
+            customer_id=customer_id,
+            display_name=display_name,
+            mandate_limit=initial_budget,
+            allowed_categories=["electronics", "apparel", "food", "accessories", "office"],
+            allowed_merchants=["MERCH_TECH_DIRECT", "MERCH_FASHION_HUB", "MERCH_GOURMET", "MERCH_OFFICE_DEPOT"],
+            email=clean_email or f"{clean_username}@example.com",
+        )
+    except Exception as e:
+        customer_auth_store.delete_user(customer_id)
+        raise e
+
+    return customer_id, creds
+
