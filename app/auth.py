@@ -21,7 +21,7 @@ def get_admin_api_key() -> str:
     """
     global _AUTO_GENERATED_PROD_KEY
     env_key = os.environ.get("ADMIN_API_KEY")
-    is_prod = os.environ.get("ENVIRONMENT", os.environ.get("ENV", "development")).lower() == "production" or bool(os.environ.get("RENDER"))
+    is_prod = os.environ.get("ENVIRONMENT", os.environ.get("ENV", "development")).lower() == "production"
 
     if env_key and env_key != "dev-admin-secret-key":
         return env_key
