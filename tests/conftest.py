@@ -26,15 +26,13 @@ def isolate_test_environment(tmp_path, monkeypatch):
     - Resets the in-memory mandate store to DEMO_MANDATES.
     """
     test_db = str(tmp_path / "test_isolated_gateway.db")
+    monkeypatch.setenv("DATABASE_URL", test_db)
     monkeypatch.setattr(audit_store, "db_path", test_db)
     monkeypatch.setattr(customer_auth_store, "db_path", test_db)
+    monkeypatch.setattr(mandate_store, "db_path", test_db)
     audit_store._init_db()
     customer_auth_store._init_db()
-
-    # Reset mandate store state
-    mandate_store._mandates = {
-        k: v.model_copy() for k, v in DEMO_MANDATES.items()
-    }
+    mandate_store._init_db()
 
     yield test_db
 

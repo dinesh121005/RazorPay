@@ -506,8 +506,7 @@ def test_resolve_customer_ambiguous_match_returns_candidates():
         assert exact_res["customer_id"] == "CUST999"
     finally:
         # Cleanup
-        if "CUST999" in mandate_store._mandates:
-            del mandate_store._mandates["CUST999"]
+        mandate_store.delete_mandate("CUST999")
 
 
 def test_mcp_flow_resolve_then_propose_canonical_kb001_and_mn001():
