@@ -162,15 +162,34 @@ def create_remote_mcp_server() -> MCPServer:
     return server
 
 
+from contextlib import asynccontextmanager
+from mcp.server.transport_security import TransportSecuritySettings
+
+
+# Remote MCP Server Singleton & Streamable App
+remote_mcp_server = create_remote_mcp_server()
+_transport_sec = TransportSecuritySettings(enable_dns_rebinding_protection=False)
+_streamable_asgi = remote_mcp_server.streamable_http_app(
+    streamable_http_path="/",
+    transport_security=_transport_sec,
+    stateless_http=True,
+)
+
+
+@asynccontextmanager
+async def remote_mcp_lifespan(app: FastAPI):
+    """
+    FastAPI lifespan context manager initializing the MCP StreamableHTTP session task group.
+    """
+    async with remote_mcp_server._lowlevel_server._session_manager.run():
+        yield
+
+
 def get_remote_mcp_app() -> Starlette:
     """
     Builds the Starlette ASGI application for Streamable HTTP transport with OAuth authentication middleware.
     """
-    remote_server = create_remote_mcp_server()
-    streamable_app = remote_server.streamable_http_app()
-    
-    # Wrap in authentication middleware
-    app = Starlette(routes=streamable_app.routes)
+    app = Starlette(routes=_streamable_asgi.routes)
     app.add_middleware(McpAuthMiddleware)
     return app
 

@@ -19,14 +19,15 @@ from app.admin.router import router as admin_router
 from app.agent.router import router as agent_router
 from app.audit import audit_router
 from app.catalog.router import router as catalog_router
-from app.mcp.server import mount_remote_mcp
+from app.mcp.server import mount_remote_mcp, remote_mcp_lifespan
 from app.merchant_agent import merchant_agent_router
 from app.oauth.router import router as oauth_router
 
 app = FastAPI(
     title="Agentic Commerce Gateway",
     description="Merchant-side gateway enabling AI shopping agents to transact under bounded, auditable policy mandates.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=remote_mcp_lifespan,
 )
 
 # Mount static files directory if it exists
