@@ -67,6 +67,14 @@ def to_customer_response(full_response: PurchaseResponse) -> Dict[str, Any]:
     qr_code_url = full_response.payment.qr_code_url if full_response.payment else None
     payment_method = full_response.payment.payment_method if full_response.payment else None
 
+    user_instructions = None
+    if payment_url and full_response.decision == "REJECTED":
+        user_instructions = (
+            "Item exceeds autonomous mandate limit. The merchant gateway has generated a secure, official "
+            "Razorpay Checkout Link and UPI QR Code. You MUST provide this checkout link and QR code to the "
+            "human user so they can complete payment manually via UPI, Netbanking, or Card."
+        )
+
     return {
         "decision": full_response.decision,
         "product_name": product.name,
@@ -76,6 +84,7 @@ def to_customer_response(full_response: PurchaseResponse) -> Dict[str, Any]:
         "payment_url": payment_url,
         "qr_code_url": qr_code_url,
         "payment_method": payment_method,
+        "user_instructions": user_instructions,
         "requires_confirmation": full_response.requires_confirmation,
         "confirmation_token": full_response.confirmation_token,
     }
@@ -375,8 +384,9 @@ def register_tools(server: MCPServer) -> None:
         description=(
             "Propose a purchase under customer mandate rules. Evaluates deterministic policy rules "
             "(budget limit, cumulative daily cap, merchant, category, stock). "
-            "For gated transactions >= ₹500, this returns `requires_confirmation: true` and a `confirmation_token`. "
-            "An agent may only propose, never authorize. Present the quote to the user before calling `confirm_purchase`."
+            "1. If within auto-pay limit (< ₹500), auto-debits wallet directly. "
+            "2. For gated transactions (₹500 to mandate limit), returns `requires_confirmation: true` and `confirmation_token`. Present quote to user and call `confirm_purchase`. "
+            "3. If item price exceeds customer's autonomous mandate limit (e.g. > ₹2,000), the gateway refuses auto-debit and provides an official Razorpay Checkout Link (`payment_url`) and UPI QR code (`qr_code_url`). You MUST provide this link and QR code to the human user so they can complete payment manually via UPI, Netbanking, or Card."
         )
     )
     def propose_purchase(
@@ -467,9 +477,9 @@ def register_remote_tools(server: MCPServer) -> None:
             "Propose a single product purchase on behalf of the authenticated customer. "
             "Pass exactly ONE specific product_id (e.g. 'FD005', 'KB001', 'HK001'). If purchasing multiple distinct items, call this tool once per item. "
             "Customer identity is bound strictly to verified OAuth JWT. "
-            "Mandatory Safety Protocol: For orders >= ₹500, this returns `requires_confirmation: true` and a `confirmation_token`. "
-            "As an AI Buyer Agent, you have proposal-only authority. You MUST present the full quote (item, quantity, ₹ amount) "
-            "to the human user and wait for their explicit approval before calling `confirm_purchase`."
+            "1. If within auto-pay limit (< ₹500), auto-debits wallet directly. "
+            "2. For gated orders (₹500 to mandate limit), returns `requires_confirmation: true` and `confirmation_token`. Present quote to user and call `confirm_purchase`. "
+            "3. If order exceeds autonomous mandate limit (e.g. > ₹2,000), the gateway refuses autonomous auto-debit and provides an official Razorpay Checkout Link (`payment_url`) and UPI QR Code (`qr_code_url`). You MUST provide this link and QR code to the human user so they can complete payment manually on their own device via UPI, Netbanking, or Card."
         )
     )
     def propose_purchase_remote(
