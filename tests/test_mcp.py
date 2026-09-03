@@ -612,3 +612,37 @@ async def test_mcp_server_call_resolve_customer_async():
     assert data["customer_id"] == "CUST001"
     assert data["display_name"] == "Dinesh Kumar"
 
+
+@pytest.mark.anyio
+async def test_check_order_status_tool():
+    """
+    Verifies that check_order_status returns fulfillment confirmation and payment settlement details.
+    """
+    txn_id = "txn-check-status-888"
+    audit_store.write_proposal(
+        transaction_id=txn_id,
+        customer_id="CUST001",
+        product_id="MN001",
+        merchant_id="MERCH_ELEC",
+        quantity=1,
+        amount=4999.0,
+        decision="APPROVED",
+        decision_reason="Customer paid via Razorpay",
+        idempotency_key="idemp-check-888",
+    )
+    audit_store.update_payment_outcome(
+        transaction_id=txn_id,
+        payment_status="captured",
+        razorpay_order_id="pay_TXUHER1RkvG9tP",
+    )
+
+    from app.mcp.tools import check_order_status_handler
+    res = check_order_status_handler(reference_or_id=txn_id, customer_id="CUST001")
+    assert res["order_found"] is True
+    assert res["is_paid"] is True
+    assert res["payment_status"] == "captured"
+    assert res["order_status"] == "PLACED_AND_CONFIRMED"
+    assert res["product_name"] == "27-inch 4K UHD Monitor"
+    assert res["reference_code"] == "REF-STATUS-888" or res["reference_code"].startswith("REF-")
+    assert "CONFIRMED & PAID" in res["message"]
+

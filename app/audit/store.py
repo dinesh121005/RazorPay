@@ -599,6 +599,88 @@ class AuditStore:
             )
             conn.commit()
 
+    def get_latest_orders(self, customer_id: Optional[str] = None, limit: int = 5) -> List[AuditRecord]:
+        """Retrieves the most recent audit records, optionally filtered by customer."""
+        self._ensure_db_initialized()
+        query = (
+            "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
+            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
+            "prev_hash, record_hash "
+            "FROM audit_records "
+        )
+        params: List[Any] = []
+        if customer_id:
+            query += "WHERE customer_id = ? "
+            params.append(customer_id.strip())
+        query += "ORDER BY timestamp DESC LIMIT ?;"
+        params.append(limit)
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(params))
+            rows = cursor.fetchall()
+            return [
+                AuditRecord(
+                    transaction_id=row[0],
+                    timestamp=row[1],
+                    customer_id=row[2],
+                    product_id=row[3],
+                    merchant_id=row[4],
+                    quantity=row[5],
+                    amount=row[6],
+                    decision=row[7],
+                    decision_reason=row[8],
+                    payment_status=row[9],
+                    razorpay_order_id=row[10],
+                    idempotency_key=row[11] if len(row) > 11 else None,
+                    prev_hash=row[12] if len(row) > 12 else "GENESIS",
+                    record_hash=row[13] if len(row) > 13 else None,
+                )
+                for row in rows
+            ]
+
+    def lookup_order(self, identifier: Optional[str] = None, customer_id: Optional[str] = None) -> Optional[AuditRecord]:
+        """Looks up an order by reference code suffix, transaction_id, or razorpay_order_id."""
+        if not identifier or not identifier.strip():
+            latest = self.get_latest_orders(customer_id=customer_id, limit=1)
+            return latest[0] if latest else None
+
+        ident = identifier.strip().replace("REF-", "").replace("TX-", "")
+        self._ensure_db_initialized()
+        query = (
+            "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
+            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
+            "prev_hash, record_hash "
+            "FROM audit_records "
+            "WHERE transaction_id = ? "
+            "   OR transaction_id LIKE ? "
+            "   OR razorpay_order_id = ? "
+            "   OR razorpay_order_id LIKE ? "
+            "ORDER BY timestamp DESC LIMIT 1;"
+        )
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (ident, f"%{ident}%", ident, f"%{ident}%"))
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return AuditRecord(
+                transaction_id=row[0],
+                timestamp=row[1],
+                customer_id=row[2],
+                product_id=row[3],
+                merchant_id=row[4],
+                quantity=row[5],
+                amount=row[6],
+                decision=row[7],
+                decision_reason=row[8],
+                payment_status=row[9],
+                razorpay_order_id=row[10],
+                idempotency_key=row[11] if len(row) > 11 else None,
+                prev_hash=row[12] if len(row) > 12 else "GENESIS",
+                record_hash=row[13] if len(row) > 13 else None,
+            )
+
     def get_ledger_anchor(self) -> Dict[str, Any]:
         """
         Computes an exportable cryptographic checkpoint anchor of the audit ledger.

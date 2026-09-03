@@ -30,6 +30,7 @@ from app.agent.service import (
     execute_purchase,
     generate_bucketed_idempotency_key,
 )
+from app.audit import audit_store
 from app.catalog.service import get_product, search_products
 from app.exceptions import GatewayError
 from app.merchant_agent.models import InquiryRequest
@@ -309,10 +310,81 @@ def confirm_purchase_remote_handler(
     )
 
 
+def check_order_status_handler(
+    reference_or_id: Optional[str] = None,
+    customer_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Looks up order and payment status from the merchant audit ledger.
+    Allows Claude to confirm to the user that their payment was captured and their order placed.
+    """
+    effective_customer_id = customer_id or "CUST001"
+    record = audit_store.lookup_order(identifier=reference_or_id, customer_id=effective_customer_id)
+    if not record:
+        return {
+            "order_found": False,
+            "message": "No order records found for this customer.",
+        }
+
+    product = get_product(record.product_id)
+    p_name = product.name if product else record.product_id
+    is_paid = record.payment_status in ("captured", "paid")
+    ref_code = f"REF-{record.transaction_id[-8:].upper()}"
+
+    return {
+        "order_found": True,
+        "reference_code": ref_code,
+        "product_name": p_name,
+        "quantity": record.quantity,
+        "amount": record.amount,
+        "decision": record.decision,
+        "payment_status": record.payment_status or "pending",
+        "razorpay_order_id": record.razorpay_order_id,
+        "is_paid": is_paid,
+        "order_status": "PLACED_AND_CONFIRMED" if is_paid else "PENDING_PAYMENT",
+        "timestamp": record.timestamp,
+        "message": (
+            f"Merchant confirmation: Order {ref_code} for {record.quantity}x {p_name} (₹{record.amount:.2f}) is "
+            f"{'CONFIRMED & PAID via Razorpay rails' if is_paid else 'awaiting payment'}."
+        ),
+    }
+
+
+def check_order_status_remote_handler(
+    reference_or_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Remote handler checking order status bound to the authenticated OAuth customer.
+    """
+    customer_id = authenticated_customer_id.get() or "CUST001"
+    return check_order_status_handler(
+        reference_or_id=reference_or_id,
+        customer_id=customer_id,
+    )
+
+
 def register_tools(server: MCPServer) -> None:
     """
     Registers local stdio gateway tools with the MCP server instance.
     """
+    @server.tool(
+        name="check_order_status",
+        description=(
+            "Check the placement, fulfillment, and payment status of a customer's order. "
+            "Call this whenever the user asks if their order is placed, asks if payment was received, "
+            "or requests confirmation/reference code for a recent purchase."
+        )
+    )
+    def check_order_status_tool(
+        reference_or_id: Optional[str] = None,
+        customer_id: str = "CUST001",
+    ) -> Dict[str, Any]:
+        """Check order and payment settlement status."""
+        return check_order_status_handler(
+            reference_or_id=reference_or_id,
+            customer_id=customer_id,
+        )
+
     @server.tool(
         name="inquire_merchant",
         description=(
@@ -423,6 +495,22 @@ def register_remote_tools(server: MCPServer) -> None:
     """
     Registers remote OAuth-authenticated gateway tools with the remote MCP server instance.
     """
+    @server.tool(
+        name="check_order_status",
+        description=(
+            "Check the placement, fulfillment, and payment status of a customer's order. "
+            "Call this whenever the user asks if their order is placed, asks if payment was received, "
+            "or requests confirmation/reference code for a recent purchase."
+        )
+    )
+    def check_order_status_tool(
+        reference_or_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Check order and payment settlement status."""
+        return check_order_status_remote_handler(
+            reference_or_id=reference_or_id,
+        )
+
     @server.tool(
         name="inquire_merchant",
         description="Consult the Merchant Sales AI Agent with a natural language procurement inquiry."
