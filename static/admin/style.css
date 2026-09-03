@@ -733,6 +733,79 @@ body {
   height: 230px;
 }
 
+/* Analytics & Deep Telemetry Styles */
+.analytics-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 1.25rem;
+}
+
+.chart-box {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-md);
+}
+
+.policy-enforcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 255px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.policy-event-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.2s;
+}
+
+.policy-event-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.policy-event-item.blocked {
+  border-left: 3px solid #EF4444;
+}
+
+.policy-event-item.approved {
+  border-left: 3px solid #10B981;
+}
+
+.policy-event-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.policy-event-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #FFF;
+}
+
+.policy-event-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.policy-event-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
 /* Top Performing AI Cross-Sell Bundles */
 .top-bundles-wrapper {
   background: rgba(255, 255, 255, 0.015);

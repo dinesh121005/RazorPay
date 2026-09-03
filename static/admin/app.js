@@ -59,6 +59,17 @@ class AdminDashboard {
     this.splitBaselineBar = document.getElementById("split-baseline-bar");
     this.splitAiBar = document.getElementById("split-ai-bar");
 
+    // Analytics Tab Telemetry Elements
+    this.analyticsApprovedCount = document.getElementById("analytics-approved-count");
+    this.analyticsApprovedVol = document.getElementById("analytics-approved-vol");
+    this.analyticsRejectedCount = document.getElementById("analytics-rejected-count");
+    this.analyticsRejectedSaved = document.getElementById("analytics-rejected-saved");
+    this.analyticsAutopayCount = document.getElementById("analytics-autopay-count");
+    this.analyticsAutopayVol = document.getElementById("analytics-autopay-vol");
+    this.analyticsHumangatedCount = document.getElementById("analytics-humangated-count");
+    this.analyticsHumangatedVol = document.getElementById("analytics-humangated-vol");
+    this.analyticsPolicyList = document.getElementById("analytics-policy-list");
+
     // Tables
     this.recentTbody = document.getElementById("recent-transactions-tbody");
     this.auditTbody = document.getElementById("audit-full-tbody");
@@ -115,13 +126,13 @@ class AdminDashboard {
 
     // Hash-based tab navigation
     const initialHash = window.location.hash.replace("#", "");
-    if (["overview", "audit", "mandates", "catalog", "sandbox"].includes(initialHash)) {
+    if (["overview", "analytics", "audit", "mandates", "catalog", "sandbox"].includes(initialHash)) {
       this.switchTab(initialHash);
     }
 
     window.addEventListener("hashchange", () => {
       const newHash = window.location.hash.replace("#", "");
-      if (["overview", "audit", "mandates", "catalog", "sandbox"].includes(newHash) && newHash !== this.currentTab) {
+      if (["overview", "analytics", "audit", "mandates", "catalog", "sandbox"].includes(newHash) && newHash !== this.currentTab) {
         this.switchTab(newHash);
       }
     });
@@ -292,6 +303,7 @@ class AdminDashboard {
         this.fetchCatalog(),
       ]);
       this.renderOverviewMetrics();
+      this.renderAnalyticsTab();
       this.renderAuditTable();
       this.renderMandatesTable();
       this.renderCatalogGrid();
@@ -490,10 +502,37 @@ class AdminDashboard {
       this.revenueChartInstance = null;
     }
 
-    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Today"];
-    const progressFactors = [0.18, 0.32, 0.45, 0.60, 0.74, 0.88, 1.0];
-    const totalData = progressFactors.map((f) => Math.round(totalSettledVolume * f));
-    const aiData = progressFactors.map((f) => Math.round(aiAttributedVolume * f));
+    const sorted = [...settledRecords].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    let labels = [];
+    let totalData = [];
+    let aiData = [];
+
+    if (sorted.length > 0) {
+      let runningTotal = 0;
+      let runningAi = 0;
+
+      sorted.forEach((r) => {
+        const amt = Number(r.amount) || 0;
+        runningTotal += amt;
+        totalData.push(runningTotal);
+
+        const isAiOrder = r.product_id.startsWith("FD") || r.product_id.startsWith("CB") || r.product_id.startsWith("MG") || r.product_id.startsWith("GT") || amt < 500;
+        if (isAiOrder) {
+          runningAi += amt;
+        }
+        aiData.push(runningAi);
+
+        const d = new Date(r.timestamp);
+        const dateStr = d.toLocaleDateString([], { month: "short", day: "numeric" });
+        const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        labels.push(`${dateStr} ${timeStr}`);
+      });
+    } else {
+      labels = ["No Data"];
+      totalData = [0];
+      aiData = [0];
+    }
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -519,7 +558,7 @@ class AdminDashboard {
               borderColor: "#A78BFA",
               backgroundColor: aiGrad,
               borderWidth: 2.8,
-              tension: 0.42,
+              tension: 0.35,
               fill: true,
               pointBackgroundColor: "#8B5CF6",
               pointBorderColor: "#FFF",
@@ -533,7 +572,7 @@ class AdminDashboard {
               borderColor: "#38BDF8",
               backgroundColor: totalGrad,
               borderWidth: 2.8,
-              tension: 0.42,
+              tension: 0.35,
               fill: true,
               pointBackgroundColor: "#0284C7",
               pointBorderColor: "#FFF",
@@ -563,6 +602,11 @@ class AdminDashboard {
               padding: 10,
               displayColors: true,
               callbacks: {
+                title: function (context) {
+                  const idx = context[0].dataIndex;
+                  const rec = sorted[idx];
+                  return rec ? `${labels[idx]} • Product: ${rec.product_id}` : labels[idx];
+                },
                 label: function (context) {
                   const label = context.dataset.label || "";
                   const val = context.parsed.y || 0;
@@ -580,8 +624,9 @@ class AdminDashboard {
                 color: "#94A3B8",
                 font: {
                   family: "Inter, sans-serif",
-                  size: 11,
+                  size: 10,
                 },
+                maxRotation: 45,
               },
             },
             y: {
@@ -615,7 +660,7 @@ class AdminDashboard {
     const parent = canvas.parentElement;
     if (!parent) return;
     const total = totalSettledVolume || 21825;
-    const ai = aiAttributedVolume || 11785;
+    const ai = aiAttributedVolume || 2331;
     parent.innerHTML = `
       <svg width="100%" height="220" viewBox="0 0 600 220" preserveAspectRatio="none" style="overflow: visible;">
         <defs>
@@ -645,15 +690,299 @@ class AdminDashboard {
         <circle cx="570" cy="78" r="5" fill="#8B5CF6" stroke="#FFF" stroke-width="2" />
         <text x="560" y="70" fill="#A78BFA" font-size="11" font-family="Inter" font-weight="700" text-anchor="end">AI: ₹${Math.round(ai).toLocaleString("en-IN")}</text>
 
-        <text x="40" y="212" fill="#94A3B8" font-size="10" font-family="Inter">Mon</text>
-        <text x="128" y="212" fill="#94A3B8" font-size="10" font-family="Inter">Tue</text>
-        <text x="216" y="212" fill="#94A3B8" font-size="10" font-family="Inter">Wed</text>
-        <text x="304" y="212" fill="#94A3B8" font-size="10" font-family="Inter">Thu</text>
-        <text x="392" y="212" fill="#94A3B8" font-size="10" font-family="Inter">Fri</text>
-        <text x="480" y="212" fill="#94A3B8" font-size="10" font-family="Inter">Sat</text>
-        <text x="560" y="212" fill="#38BDF8" font-size="10" font-family="Inter" font-weight="700">Today</text>
+        <text x="40" y="212" fill="#94A3B8" font-size="10" font-family="Inter">Sep 02</text>
+        <text x="300" y="212" fill="#94A3B8" font-size="10" font-family="Inter">Sep 02 (Night)</text>
+        <text x="540" y="212" fill="#38BDF8" font-size="10" font-family="Inter" font-weight="700">Sep 03 (Live)</text>
       </svg>
     `;
+  }
+
+  renderAnalyticsTab() {
+    const records = this.auditRecords || [];
+    const settledRecords = records.filter(
+      (r) => r.payment_status === "captured" || r.payment_status === "paid" || (r.decision === "APPROVED" && r.payment_status !== "failed")
+    );
+    const approvedRecords = records.filter((r) => r.decision === "APPROVED");
+    const rejectedRecords = records.filter((r) => r.decision === "REJECTED");
+    const pendingRecords = records.filter((r) => r.decision === "PENDING_CONFIRMATION");
+
+    const totalSettledVol = settledRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const rejectedSavedVol = rejectedRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+    // Auto-Pay (< ₹500) vs Human Gated (≥ ₹500)
+    const autoPayRecords = settledRecords.filter((r) => (Number(r.amount) || 0) < 500);
+    const humanGatedRecords = settledRecords.filter((r) => (Number(r.amount) || 0) >= 500);
+
+    const autoPayVol = autoPayRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const humanGatedVol = humanGatedRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+    // Update KPI Card Numbers
+    if (this.analyticsApprovedCount) this.analyticsApprovedCount.textContent = `${approvedRecords.length} orders`;
+    if (this.analyticsApprovedVol) this.analyticsApprovedVol.textContent = `₹${totalSettledVol.toLocaleString("en-IN", { minimumFractionDigits: 2 })} settled volume`;
+
+    if (this.analyticsRejectedCount) this.analyticsRejectedCount.textContent = `${rejectedRecords.length} intercepted`;
+    if (this.analyticsRejectedSaved) this.analyticsRejectedSaved.textContent = `₹${rejectedSavedVol.toLocaleString("en-IN", { minimumFractionDigits: 2 })} overspending prevented`;
+
+    if (this.analyticsAutopayCount) this.analyticsAutopayCount.textContent = `${autoPayRecords.length} orders`;
+    if (this.analyticsAutopayVol) this.analyticsAutopayVol.textContent = `₹${autoPayVol.toLocaleString("en-IN", { minimumFractionDigits: 2 })} frictionless volume`;
+
+    if (this.analyticsHumangatedCount) this.analyticsHumangatedCount.textContent = `${humanGatedRecords.length} orders`;
+    if (this.analyticsHumangatedVol) this.analyticsHumangatedVol.textContent = `₹${humanGatedVol.toLocaleString("en-IN", { minimumFractionDigits: 2 })} JWT-confirmed volume`;
+
+    // Render Charts
+    this.renderAnalyticsTimelineChart(settledRecords);
+    this.renderAnalyticsExecutionChart(autoPayRecords.length, humanGatedRecords.length, autoPayVol, humanGatedVol);
+    this.renderAnalyticsDecisionsChart(approvedRecords.length, rejectedRecords.length, pendingRecords.length);
+    this.renderAnalyticsPolicyList(rejectedRecords, approvedRecords);
+  }
+
+  renderAnalyticsTimelineChart(settledRecords) {
+    const canvas = document.getElementById("analytics-timeline-chart");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    if (this.analyticsTimelineChartInstance) {
+      try { this.analyticsTimelineChartInstance.destroy(); } catch (e) {}
+      this.analyticsTimelineChartInstance = null;
+    }
+
+    const sorted = [...settledRecords].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const labels = [];
+    const totalData = [];
+    const aiData = [];
+
+    let runningTotal = 0;
+    let runningAi = 0;
+
+    sorted.forEach((r) => {
+      const amt = Number(r.amount) || 0;
+      runningTotal += amt;
+      totalData.push(runningTotal);
+
+      const isAiOrder = r.product_id.startsWith("FD") || r.product_id.startsWith("CB") || r.product_id.startsWith("MG") || amt < 500;
+      if (isAiOrder) runningAi += amt;
+      aiData.push(runningAi);
+
+      const d = new Date(r.timestamp);
+      const dateStr = d.toLocaleDateString([], { month: "short", day: "numeric" });
+      const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      labels.push(`${dateStr} ${timeStr}`);
+    });
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const totalGrad = ctx.createLinearGradient(0, 0, 0, 260);
+    totalGrad.addColorStop(0, "rgba(56, 189, 248, 0.35)");
+    totalGrad.addColorStop(1, "rgba(56, 189, 248, 0.0)");
+
+    const aiGrad = ctx.createLinearGradient(0, 0, 0, 260);
+    aiGrad.addColorStop(0, "rgba(167, 139, 250, 0.38)");
+    aiGrad.addColorStop(1, "rgba(167, 139, 250, 0.0)");
+
+    try {
+      this.analyticsTimelineChartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Cumulative Settled",
+              data: totalData,
+              borderColor: "#38BDF8",
+              backgroundColor: totalGrad,
+              borderWidth: 2.5,
+              tension: 0.35,
+              fill: true,
+              pointBackgroundColor: "#0284C7",
+              pointRadius: 4,
+              pointHoverRadius: 7,
+            },
+            {
+              label: "AI Food & Concierge",
+              data: aiData,
+              borderColor: "#A78BFA",
+              backgroundColor: aiGrad,
+              borderWidth: 2.5,
+              tension: 0.35,
+              fill: true,
+              pointBackgroundColor: "#8B5CF6",
+              pointRadius: 4,
+              pointHoverRadius: 7,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "rgba(15, 23, 42, 0.95)",
+              borderColor: "rgba(255, 255, 255, 0.12)",
+              borderWidth: 1,
+              callbacks: {
+                label: function (ctx) {
+                  return ` ${ctx.dataset.label}: ₹${ctx.parsed.y.toLocaleString("en-IN")}`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: "rgba(255, 255, 255, 0.05)" },
+              ticks: { color: "#94A3B8", font: { size: 10 }, maxRotation: 45 },
+            },
+            y: {
+              grid: { color: "rgba(255, 255, 255, 0.05)" },
+              ticks: {
+                color: "#94A3B8",
+                callback: function (v) { return v >= 1000 ? `₹${Math.round(v/1000)}k` : `₹${v}`; },
+              },
+            },
+          },
+        },
+      });
+    } catch (e) {
+      console.warn("Analytics timeline chart error:", e);
+    }
+  }
+
+  renderAnalyticsExecutionChart(autoPayCount, humanGatedCount, autoPayVol, humanGatedVol) {
+    const canvas = document.getElementById("analytics-execution-chart");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    if (this.analyticsExecutionChartInstance) {
+      try { this.analyticsExecutionChartInstance.destroy(); } catch (e) {}
+      this.analyticsExecutionChartInstance = null;
+    }
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    try {
+      this.analyticsExecutionChartInstance = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: ["⚡ Autonomous Auto-Pay (< ₹500)", "🛡️ Two-Step Human Gated (≥ ₹500)"],
+          datasets: [
+            {
+              data: [autoPayCount, humanGatedCount],
+              backgroundColor: ["#10B981", "#8B5CF6"],
+              borderColor: "rgba(16, 23, 38, 0.9)",
+              borderWidth: 3,
+              hoverOffset: 6,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: "#94A3B8", font: { size: 11 }, padding: 15 },
+            },
+            tooltip: {
+              backgroundColor: "rgba(15, 23, 42, 0.95)",
+              callbacks: {
+                label: function (ctx) {
+                  const isAuto = ctx.dataIndex === 0;
+                  const count = ctx.parsed;
+                  const vol = isAuto ? autoPayVol : humanGatedVol;
+                  return ` ${count} orders • ₹${vol.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+                },
+              },
+            },
+          },
+          cutout: "68%",
+        },
+      });
+    } catch (e) {
+      console.warn("Analytics execution chart error:", e);
+    }
+  }
+
+  renderAnalyticsDecisionsChart(approvedCount, rejectedCount, pendingCount) {
+    const canvas = document.getElementById("analytics-decisions-chart");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    if (this.analyticsDecisionsChartInstance) {
+      try { this.analyticsDecisionsChartInstance.destroy(); } catch (e) {}
+      this.analyticsDecisionsChartInstance = null;
+    }
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    try {
+      this.analyticsDecisionsChartInstance = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: ["✓ Approved & Settled", "🛡️ Policy Interceptions", "⏳ Pending Confirmation"],
+          datasets: [
+            {
+              data: [approvedCount, rejectedCount, pendingCount],
+              backgroundColor: ["#10B981", "#EF4444", "#F59E0B"],
+              borderColor: "rgba(16, 23, 38, 0.9)",
+              borderWidth: 3,
+              hoverOffset: 6,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: "#94A3B8", font: { size: 11 }, padding: 15 },
+            },
+            tooltip: {
+              backgroundColor: "rgba(15, 23, 42, 0.95)",
+              callbacks: {
+                label: function (ctx) {
+                  return ` ${ctx.label}: ${ctx.parsed} proposals`;
+                },
+              },
+            },
+          },
+          cutout: "68%",
+        },
+      });
+    } catch (e) {
+      console.warn("Analytics decisions chart error:", e);
+    }
+  }
+
+  renderAnalyticsPolicyList(rejectedRecords, approvedRecords) {
+    const container = document.getElementById("analytics-policy-list");
+    if (!container) return;
+
+    if (!rejectedRecords || rejectedRecords.length === 0) {
+      container.innerHTML = `<div class="text-xs text-muted text-center py-4">No policy violations recorded. All proposals compliant.</div>`;
+      return;
+    }
+
+    container.innerHTML = rejectedRecords
+      .slice(0, 5)
+      .map((r) => {
+        const product = (this.products || []).find((p) => p.id === r.product_id);
+        const pName = product ? product.name : (r.product_id || "Unknown");
+        const amt = (Number(r.amount) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        const reason = escapeHtml(r.decision_reason || "Amount exceeds customer mandate limit");
+
+        return `
+          <div class="policy-event-item blocked">
+            <div class="policy-event-info">
+              <span class="policy-event-title">🛡️ Intercepted: ${escapeHtml(pName)} (₹${amt})</span>
+              <span class="policy-event-desc">${reason} • Customer: ${escapeHtml(r.customer_id)}</span>
+            </div>
+            <span class="policy-event-badge badge badge-danger">BLOCKED</span>
+          </div>
+        `;
+      })
+      .join("");
   }
 
   renderAuditTable() {

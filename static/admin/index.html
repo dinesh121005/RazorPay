@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/static/admin/style.css?v=4.0">
+  <link rel="stylesheet" href="/static/admin/style.css?v=5.0">
 </head>
 <body>
   <!-- Header Bar -->
@@ -66,6 +66,16 @@
           <span>Overview</span>
         </button>
         
+        <button class="nav-item" data-tab="analytics">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span>Analytics & Insights</span>
+          <span class="nav-badge" style="background: rgba(16, 185, 129, 0.18); color: #10B981; font-weight: 700;">PRO</span>
+        </button>
+
         <button class="nav-item" data-tab="audit">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -349,6 +359,128 @@
                   <tr><td colspan="8" class="text-center py-6 text-muted">Loading recent transactions...</td></tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: ANALYTICS & INSIGHTS (PRO TELEMETRY) -->
+      <section id="tab-analytics" class="tab-pane">
+        <div class="section-header">
+          <div>
+            <div class="badge-row">
+              <span class="badge badge-track01">Track 01: Deep Telemetry</span>
+              <span class="badge badge-pulse"><span class="pulse-dot"></span> Reconciled Live DB Records</span>
+            </div>
+            <h2 class="section-title mt-1">Commerce Intelligence & Execution Analytics</h2>
+            <p class="section-subtitle">Comprehensive breakdown of approved vs. rejected proposals, autonomous micro-pay (&lt; ₹500) vs. human-gated (≥ ₹500) transactions, and real chronological ledger timeline.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="dashboard.fetchAllData()">
+            <span>↻ Refresh Telemetry</span>
+          </button>
+        </div>
+
+        <!-- Row 1: Key Execution Metrics Grid -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Approved & Settled</span>
+              <span class="metric-icon green">✓</span>
+            </div>
+            <div class="metric-value" id="analytics-approved-count">0</div>
+            <div class="metric-sub" id="analytics-approved-vol">₹0.00 settled volume</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Policy Interceptions</span>
+              <span class="metric-icon" style="background: rgba(239, 68, 68, 0.15); color: #EF4444;">🛡️</span>
+            </div>
+            <div class="metric-value" id="analytics-rejected-count">0</div>
+            <div class="metric-sub text-danger" id="analytics-rejected-saved">₹0.00 overspending prevented</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">⚡ Autonomous Auto-Pay (&lt; ₹500)</span>
+              <span class="metric-icon" style="background: rgba(16, 185, 129, 0.15); color: #10B981;">⚡</span>
+            </div>
+            <div class="metric-value text-success" id="analytics-autopay-count">0</div>
+            <div class="metric-sub" id="analytics-autopay-vol">₹0.00 frictionless execution</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">🔐 Two-Step Human Gated (≥ ₹500)</span>
+              <span class="metric-icon purple">🛡️</span>
+            </div>
+            <div class="metric-value" style="color: #A78BFA;" id="analytics-humangated-count">0</div>
+            <div class="metric-sub" id="analytics-humangated-vol">₹0.00 JWT-confirmed volume</div>
+          </div>
+        </div>
+
+        <!-- Row 2: Dual Core Charts -->
+        <div class="analytics-charts-grid mt-6">
+          <!-- Chart A: Real Chronological Revenue Timeline -->
+          <div class="card chart-box">
+            <div class="card-header">
+              <div>
+                <p class="card-eyebrow">Database Timeline</p>
+                <h3 class="card-title">Chronological Revenue Progression</h3>
+                <p class="text-xs text-muted">Every data point maps to an exact real transaction in PostgreSQL / SQLite</p>
+              </div>
+              <div class="chart-legend-custom">
+                <span class="legend-item"><span class="legend-dot cyan"></span> Cumulative Settled (₹)</span>
+                <span class="legend-item"><span class="legend-dot purple"></span> AI Food & Concierge (₹)</span>
+              </div>
+            </div>
+            <div class="chart-canvas-container" style="height: 270px;">
+              <canvas id="analytics-timeline-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart B: Auto-Pay vs Human Gated Distribution -->
+          <div class="card chart-box">
+            <div class="card-header">
+              <div>
+                <p class="card-eyebrow">Execution Mode</p>
+                <h3 class="card-title">Auto-Pay vs Human Gated</h3>
+                <p class="text-xs text-muted">Frictionless autonomous micro-payments (&lt; ₹500) vs 5-minute JWT confirmation</p>
+              </div>
+            </div>
+            <div class="chart-canvas-container" style="height: 270px;">
+              <canvas id="analytics-execution-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Decision Distribution & Risk Interception -->
+        <div class="analytics-charts-grid mt-6">
+          <!-- Chart C: Proposals Outcomes -->
+          <div class="card chart-box">
+            <div class="card-header">
+              <div>
+                <p class="card-eyebrow">Policy Outcomes</p>
+                <h3 class="card-title">Decision Distribution</h3>
+                <p class="text-xs text-muted">Engine evaluation breakdown across all evaluated proposals</p>
+              </div>
+            </div>
+            <div class="chart-canvas-container" style="height: 270px;">
+              <canvas id="analytics-decisions-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Policy Enforcement Summary Card -->
+          <div class="card chart-box">
+            <div class="card-header">
+              <div>
+                <p class="card-eyebrow">Financial Safety Verification</p>
+                <h3 class="card-title">Policy Enforcement & Risk Interception</h3>
+                <p class="text-xs text-muted">Verifiable proof of deterministic spend control preventing financial hazards</p>
+              </div>
+            </div>
+            <div class="policy-enforcement-list" id="analytics-policy-list">
+              <!-- Dynamically populated from live auditRecords -->
             </div>
           </div>
         </div>
@@ -657,6 +789,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- Main JavaScript App & Razorpay Checkout SDK -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="/static/admin/app.js?v=4.5"></script>
+  <script src="/static/admin/app.js?v=5.0"></script>
 </body>
 </html>
