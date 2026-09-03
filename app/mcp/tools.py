@@ -11,8 +11,12 @@ Razorpay order IDs, and payment rails internals are intentionally withheld from 
 and preserved exclusively in the SQLite audit trail for admin inspection.
 """
 from contextvars import ContextVar
+from datetime import datetime, timezone, timedelta
 import logging
 from typing import Any, Dict, List, Optional
+
+import jwt
+from app.oauth.crypto import JWT_SECRET
 try:
     from mcp.server.mcpserver import MCPServer  # type: ignore[import-not-found,import-untyped]
 except ImportError:
@@ -392,6 +396,194 @@ def check_order_status_remote_handler(
     )
 
 
+def generate_mandate_confirmation_token(customer_id: str, new_limit: float) -> str:
+    """Generates a cryptographically signed 5-minute confirmation token for conversational mandate changes."""
+    now = datetime.now(timezone.utc)
+    expiry = now + timedelta(seconds=300)
+    payload = {
+        "sub": customer_id,
+        "new_limit": float(new_limit),
+        "type": "mandate_update_confirmation",
+        "iat": int(now.timestamp()),
+        "exp": int(expiry.timestamp()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+def decode_mandate_confirmation_token(token: str) -> dict:
+    """Decodes and validates a signed mandate update confirmation token."""
+    payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    if payload.get("type") != "mandate_update_confirmation":
+        raise ValueError("Invalid token type: not a mandate confirmation token.")
+    return payload
+
+
+def get_spending_mandate_handler(customer_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Checks the active spending mandate, per-transaction limit, and allowed categories for a customer.
+    Allows the AI Buyer in conversation to answer user questions about their budget.
+    """
+    effective_id = customer_id or "CUST001"
+    mandate = mandate_store.get_mandate(effective_id)
+    if not mandate:
+        return {
+            "mandate_found": False,
+            "message": f"No spending mandate found for customer '{effective_id}'.",
+        }
+
+    return {
+        "mandate_found": True,
+        "customer_id": mandate.customer_id,
+        "display_name": mandate.display_name,
+        "currency": mandate.currency or "INR",
+        "max_limit_per_transaction": mandate.max_transaction_amount,
+        "allowed_categories": mandate.allowed_categories,
+        "allowed_merchants": mandate.allowed_merchants,
+        "expires_at": mandate.expires_at,
+        "rule_summary": mandate.prompt_playback or (
+            f"Pre-authorized spending up to ₹{mandate.max_transaction_amount:,.2f} for "
+            f"{', '.join(mandate.allowed_categories)}."
+        ),
+        "message": (
+            f"Your current AI spending mandate allows purchases up to ₹{mandate.max_transaction_amount:,.2f} "
+            f"for {', '.join(mandate.allowed_categories)}. You can request to increase or adjust this limit "
+            f"directly in this conversation."
+        ),
+    }
+
+
+def modify_spending_mandate_handler(
+    new_limit: float,
+    confirmation_token: Optional[str] = None,
+    customer_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Conversational Spending Mandate Update:
+    Allows the human user in conversation to modify their AI agent's spending mandate limit.
+    Enforces a strict Two-Step Human Gating Protocol:
+    - Step 1: Without confirmation_token, creates a signed confirmation challenge for the human user.
+    - Step 2: Once the human user explicitly confirms in chat, execute with confirmation_token.
+    """
+    effective_id = customer_id or "CUST001"
+    mandate = mandate_store.get_mandate(effective_id)
+    if not mandate:
+        return {
+            "success": False,
+            "error": f"Mandate for customer '{effective_id}' not found.",
+        }
+
+    try:
+        target_limit = round(float(new_limit), 2)
+    except (ValueError, TypeError):
+        return {
+            "success": False,
+            "error": "Invalid limit amount specified.",
+        }
+
+    if target_limit < 100.0:
+        return {
+            "success": False,
+            "error": "Minimum spending mandate limit is ₹100.00.",
+        }
+    if target_limit > 50000.0:
+        return {
+            "success": False,
+            "error": "Maximum allowable autonomous spending limit is ₹50,000.00.",
+        }
+
+    # Step 1: Human Confirmation Challenge
+    if not confirmation_token:
+        token = generate_mandate_confirmation_token(effective_id, target_limit)
+        return {
+            "requires_confirmation": True,
+            "status": "AWAITING_HUMAN_CONFIRMATION",
+            "customer_id": effective_id,
+            "current_limit": mandate.max_transaction_amount,
+            "proposed_limit": target_limit,
+            "confirmation_token": token,
+            "human_prompt": (
+                f"You are requesting to update your AI spending mandate from "
+                f"₹{mandate.max_transaction_amount:,.2f} to ₹{target_limit:,.2f}. "
+                f"Please confirm: Do you authorize this change?"
+            ),
+            "instructions": (
+                "Present the human_prompt to the user. Ask them explicitly to confirm. "
+                "Only call modify_spending_mandate again with the confirmation_token once the user confirms."
+            ),
+        }
+
+    # Step 2: Confirmation Token Execution
+    try:
+        payload = decode_mandate_confirmation_token(confirmation_token)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Invalid or expired confirmation token: {str(e)}",
+        }
+
+    token_cust = payload.get("sub")
+    if token_cust != effective_id:
+        return {
+            "success": False,
+            "error": "Token customer mismatch. Security verification failed.",
+        }
+
+    token_limit = payload.get("new_limit")
+    if abs(token_limit - target_limit) > 0.01:
+        return {
+            "success": False,
+            "error": "Target limit does not match signed confirmation token.",
+        }
+
+    updated = mandate_store.update_mandate_limit(effective_id, target_limit)
+
+    # Log audit event
+    try:
+        audit_store.log_event(
+            event_type="CUSTOMER_MANDATE_UPDATED_CONVERSATIONAL",
+            transaction_id=f"MANDATE-{effective_id}",
+            payload={
+                "customer_id": effective_id,
+                "previous_limit": mandate.max_transaction_amount,
+                "new_limit": target_limit,
+                "method": "CONVERSATIONAL_TWO_STEP_HUMAN_CONSENT",
+            }
+        )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "status": "APPROVED_AND_UPDATED",
+        "customer_id": effective_id,
+        "previous_limit": mandate.max_transaction_amount,
+        "new_limit": updated.max_transaction_amount,
+        "message": (
+            f"✅ Spending mandate successfully updated to ₹{updated.max_transaction_amount:,.2f}. "
+            f"Your AI buyer agent can now transact under this new limit."
+        ),
+    }
+
+
+def get_spending_mandate_remote_handler() -> Dict[str, Any]:
+    """Remote handler checking mandate bound to authenticated OAuth customer."""
+    customer_id = authenticated_customer_id.get() or "CUST001"
+    return get_spending_mandate_handler(customer_id=customer_id)
+
+
+def modify_spending_mandate_remote_handler(
+    new_limit: float,
+    confirmation_token: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Remote handler updating mandate bound to authenticated OAuth customer."""
+    customer_id = authenticated_customer_id.get() or "CUST001"
+    return modify_spending_mandate_handler(
+        new_limit=new_limit,
+        confirmation_token=confirmation_token,
+        customer_id=customer_id,
+    )
+
+
 def register_tools(server: MCPServer) -> None:
     """
     Registers local stdio gateway tools with the MCP server instance.
@@ -411,6 +603,43 @@ def register_tools(server: MCPServer) -> None:
         """Check order and payment settlement status."""
         return check_order_status_handler(
             reference_or_id=reference_or_id,
+            customer_id=customer_id,
+        )
+
+    @server.tool(
+        name="get_spending_mandate",
+        description=(
+            "Inspect the customer's current active spending mandate, per-transaction spending limit, "
+            "allowed product categories, and authorized merchants. Call this whenever the user asks about "
+            "their budget, asks how much they can spend, or checks their purchase allowance."
+        )
+    )
+    def get_spending_mandate_tool(
+        customer_id: str = "CUST001",
+    ) -> Dict[str, Any]:
+        """Inspect the customer's active spending mandate."""
+        return get_spending_mandate_handler(customer_id=customer_id)
+
+    @server.tool(
+        name="modify_spending_mandate",
+        description=(
+            "Modify the customer's spending mandate limit directly within the conversation. "
+            "Call this when the user asks to increase, decrease, or change their AI spending limit "
+            "(e.g. 'increase my limit to 5000', 'raise my budget'). "
+            "Protocol Guard: If confirmation_token is not provided, this returns a confirmation challenge "
+            "that you MUST present to the human user. Call this tool again with confirmation_token only after "
+            "the user says YES."
+        )
+    )
+    def modify_spending_mandate_tool(
+        new_limit: float,
+        confirmation_token: Optional[str] = None,
+        customer_id: str = "CUST001",
+    ) -> Dict[str, Any]:
+        """Request or execute a spending mandate change."""
+        return modify_spending_mandate_handler(
+            new_limit=new_limit,
+            confirmation_token=confirmation_token,
             customer_id=customer_id,
         )
 
@@ -621,6 +850,40 @@ def register_remote_tools(server: MCPServer) -> None:
     ) -> Dict[str, Any]:
         """Confirm a gated purchase on behalf of the authenticated customer."""
         return confirm_purchase_remote_handler(
+            confirmation_token=confirmation_token,
+        )
+
+    @server.tool(
+        name="get_spending_mandate",
+        description=(
+            "Inspect the authenticated customer's current active spending mandate, per-transaction spending limit, "
+            "allowed product categories, and authorized merchants. Call this whenever the user asks about "
+            "their budget, asks how much they can spend, or checks their purchase allowance."
+        )
+    )
+    def get_spending_mandate_remote(
+    ) -> Dict[str, Any]:
+        """Inspect the authenticated customer's active spending mandate."""
+        return get_spending_mandate_remote_handler()
+
+    @server.tool(
+        name="modify_spending_mandate",
+        description=(
+            "Modify the authenticated customer's spending mandate limit directly within the conversation. "
+            "Call this when the user asks to increase, decrease, or change their AI spending limit "
+            "(e.g. 'increase my limit to 5000', 'raise my budget'). "
+            "Protocol Guard: If confirmation_token is not provided, this returns a confirmation challenge "
+            "that you MUST present to the human user. Call this tool again with confirmation_token only after "
+            "the user says YES."
+        )
+    )
+    def modify_spending_mandate_remote(
+        new_limit: float,
+        confirmation_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Request or execute a spending mandate change on behalf of authenticated customer."""
+        return modify_spending_mandate_remote_handler(
+            new_limit=new_limit,
             confirmation_token=confirmation_token,
         )
 

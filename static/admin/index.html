@@ -405,7 +405,7 @@
         <div class="section-header">
           <div>
             <h2 class="section-title">Customer Mandates & Credentials</h2>
-            <p class="section-subtitle">Manage spending limits, category rules, and provision OAuth customer credentials</p>
+            <p class="section-subtitle">Inspect customer spending rules and security boundaries. Spending limits are sovereign and managed exclusively by authenticated customers.</p>
           </div>
           <button class="btn btn-primary btn-sm" id="open-new-customer-modal">
             <span>+ Provision Customer</span>
@@ -523,30 +523,36 @@
     </main>
   </div>
 
-  <!-- MODAL: Edit Mandate Limit -->
-  <div id="mandate-modal" class="modal-backdrop">
+  <!-- MODAL: Inspect Customer Mandate -->
+  <div id="inspect-mandate-modal" class="modal-backdrop">
     <div class="modal">
       <div class="modal-header">
-        <h3 class="modal-title">Update Spending Mandate Limit</h3>
-        <button class="modal-close" data-close-modal="mandate-modal">&times;</button>
+        <h3 class="modal-title">Customer Spending Mandate</h3>
+        <button class="modal-close" data-close-modal="inspect-mandate-modal">&times;</button>
       </div>
       <div class="modal-body">
+        <div style="background: rgba(79, 70, 229, 0.06); border: 1px solid rgba(79, 70, 229, 0.2); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #4F46E5; line-height: 1.45;">
+          <strong>🛡️ Zero-Trust Security Perimeter:</strong> This spending limit is established and controlled exclusively by the customer. Merchant administrators cannot modify or inflate customer authorization bounds.
+        </div>
         <div class="form-group mb-3">
           <label class="form-label">Customer ID</label>
-          <input type="text" id="modal-mandate-cust-id" class="input w-full" readonly disabled>
+          <input type="text" id="modal-inspect-cust-id" class="input w-full" readonly disabled>
         </div>
         <div class="form-group mb-3">
           <label class="form-label">Customer Name</label>
-          <input type="text" id="modal-mandate-name" class="input w-full" readonly disabled>
+          <input type="text" id="modal-inspect-name" class="input w-full" readonly disabled>
         </div>
         <div class="form-group mb-3">
-          <label class="form-label">New Max Limit per Transaction (₹ INR)</label>
-          <input type="number" id="modal-mandate-new-limit" class="input w-full" min="1" step="50" placeholder="2500">
+          <label class="form-label">Authorized Spending Cap (₹ INR)</label>
+          <input type="text" id="modal-inspect-limit" class="input w-full mono font-bold text-success" readonly disabled>
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Authority Status</label>
+          <div><span class="badge badge-success">✓ SOVEREIGN USER-MANAGED MANDATE</span></div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" data-close-modal="mandate-modal">Cancel</button>
-        <button id="save-mandate-limit-btn" class="btn btn-primary">Save New Limit</button>
+        <button class="btn btn-secondary" data-close-modal="inspect-mandate-modal">Close</button>
       </div>
     </div>
   </div>

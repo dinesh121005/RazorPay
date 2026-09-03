@@ -9,6 +9,8 @@ import httpx
 from fastapi import APIRouter, Form, Header, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
+from pydantic import BaseModel, Field
+from app.policy.store import mandate_store
 from app.oauth.crypto import create_access_token
 from app.oauth.models import TokenRequest, TokenResponse
 from app.oauth.store import (
@@ -370,6 +372,11 @@ def get_authorize_page(
                 <input type="password" name="password" placeholder="••••••••" required>
             </div>
 
+            <div class="form-group">
+                <label>AI Agent Spending Limit (₹ INR)</label>
+                <input type="number" name="mandate_limit" value="2000" min="100" max="100000" step="100" placeholder="2000" required>
+            </div>
+
             <button type="submit" class="btn-submit">Create Account & Authorize</button>
         </form>
 
@@ -377,7 +384,7 @@ def get_authorize_page(
             Demo Credentials: <strong>dinesh</strong> / <strong>password123</strong> (CUST001) or <strong>alex</strong> / <strong>password123</strong> (CUST002).
         </div>
         <div class="info-pill" id="signup-info-pill" style="display: none;">
-            ✨ New accounts are automatically provisioned with a <span class="badge-mandate">₹2,000.00</span> spending mandate.
+            ✨ You control your agent's budget. Set your initial limit above, and adjust it anytime directly in conversation with your AI buyer.
         </div>
     </div>
 
@@ -609,6 +616,7 @@ async def post_register(
     response_type: Optional[str] = Form(default="code"),
     state: Optional[str] = Form(default=None),
     scope: Optional[str] = Form(default="purchase"),
+    mandate_limit: Optional[float] = Form(default=2000.0),
 ):
     """Processes self-service registration and returns redirect with authorization code."""
     if client_id != OAUTH_CLIENT_ID:
@@ -636,13 +644,14 @@ async def post_register(
             detail=f"Email '{clean_email}' is already registered."
         )
 
+    budget = float(mandate_limit) if mandate_limit and float(mandate_limit) > 0 else 2000.0
     try:
         customer_id, _ = provision_new_customer(
             display_name=display_name.strip(),
             username=clean_user,
             email=clean_email,
             password=password,
-            initial_budget=2000.0,
+            initial_budget=budget,
         )
     except Exception as e:
         raise HTTPException(
@@ -852,3 +861,94 @@ async def post_token(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported grant_type '{grant_type}'. Supported grant types: 'authorization_code', 'refresh_token'."
         )
+
+
+class CustomerMandateUpdateRequest(BaseModel):
+    username_or_email: str = Field(..., description="Customer username or email")
+    password: str = Field(..., description="Customer account password")
+    new_limit: float = Field(..., description="Desired new per-transaction spending limit in INR", gt=0)
+
+
+@router.get("/customer/mandate-info", summary="Customer self-service mandate inquiry")
+def get_customer_mandate_info(identifier: str):
+    """
+    Returns mandate details for a customer identifier so the customer can view their limits.
+    """
+    clean_id = identifier.strip()
+    cust_id = None
+    user = customer_auth_store.get_user_by_username(clean_id.lower())
+    if user:
+        cust_id = user.customer_id
+    else:
+        user_email = customer_auth_store.get_user_by_email(clean_id.lower())
+        if user_email:
+            cust_id = user_email.customer_id
+        else:
+            matches = mandate_store.find_by_identifier(clean_id)
+            if matches:
+                cust_id = matches[0].customer_id
+
+    if not cust_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Customer '{identifier}' not found."
+        )
+
+    mandate = mandate_store.get_mandate(cust_id)
+    if not mandate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Mandate for customer '{cust_id}' not found."
+        )
+
+    return {
+        "customer_id": mandate.customer_id,
+        "display_name": mandate.display_name,
+        "email": mandate.email,
+        "mandate_limit": mandate.max_transaction_amount,
+        "allowed_categories": mandate.allowed_categories,
+        "allowed_merchants": mandate.allowed_merchants,
+        "expires_at": mandate.expires_at,
+        "prompt_playback": mandate.prompt_playback,
+    }
+
+
+@router.post("/customer/mandate/update", summary="Customer self-service mandate limit update")
+def update_customer_mandate_self(payload: CustomerMandateUpdateRequest):
+    """
+    Allows a verified customer to modify their own AI agent spending mandate limit.
+    Requires customer credentials for Zero-Trust authorization.
+    """
+    clean_id = payload.username_or_email.strip()
+    cust_id = customer_auth_store.authenticate(clean_id, payload.password)
+    if not cust_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username/email or password."
+        )
+
+    if payload.new_limit <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mandate limit must be greater than zero."
+        )
+
+    if payload.new_limit > 100000.0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum allowable personal mandate limit is ₹1,00,000.00."
+        )
+
+    updated_mandate = mandate_store.update_mandate_limit(
+        customer_id=cust_id,
+        new_limit=payload.new_limit,
+    )
+
+    return {
+        "status": "success",
+        "customer_id": cust_id,
+        "display_name": updated_mandate.display_name,
+        "new_limit": updated_mandate.max_transaction_amount,
+        "message": f"Successfully updated your spending limit to ₹{updated_mandate.max_transaction_amount:,.2f}.",
+    }
+

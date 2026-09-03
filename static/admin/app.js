@@ -1069,8 +1069,8 @@ class AdminDashboard {
             <td>${merches}</td>
             <td class="text-xs text-muted">${exp}</td>
             <td>
-              <button class="btn btn-secondary btn-sm" onclick="dashboard.openEditMandateModal('${safeCustId}', '${safeName}', ${rawLimit})">
-                Edit Limit
+              <button class="btn btn-secondary btn-sm" onclick="dashboard.openInspectMandateModal('${safeCustId}', '${safeName}', ${rawLimit})">
+                Inspect
               </button>
             </td>
           </tr>
@@ -1127,39 +1127,11 @@ class AdminDashboard {
     this.openModal("tx-detail-modal");
   }
 
-  openEditMandateModal(custId, name, currentLimit) {
-    document.getElementById("modal-mandate-cust-id").value = custId;
-    document.getElementById("modal-mandate-name").value = name;
-    document.getElementById("modal-mandate-new-limit").value = currentLimit;
-    this.openModal("mandate-modal");
-  }
-
-  async handleSaveMandateLimit() {
-    const custId = document.getElementById("modal-mandate-cust-id").value;
-    const newLimit = parseFloat(document.getElementById("modal-mandate-new-limit").value);
-
-    if (isNaN(newLimit) || newLimit <= 0) {
-      this.showToast("Please enter a valid mandate limit > 0", "error");
-      return;
-    }
-
-    try {
-      const res = await this.fetchWithAuth(`/admin/customers/${custId}/mandate`, {
-        method: "PATCH",
-        body: JSON.stringify({ mandate_limit: newLimit }),
-      });
-
-      if (res.ok) {
-        this.closeModal("mandate-modal");
-        this.showToast(`Mandate limit for ${custId} updated to ₹${newLimit.toFixed(2)}`, "success");
-        await this.fetchAllData();
-      } else {
-        const err = await res.json();
-        this.showToast(err.detail || "Failed to update mandate limit", "error");
-      }
-    } catch (e) {
-      this.showToast("Network error updating mandate", "error");
-    }
+  openInspectMandateModal(custId, name, currentLimit) {
+    document.getElementById("modal-inspect-cust-id").value = custId;
+    document.getElementById("modal-inspect-name").value = name;
+    document.getElementById("modal-inspect-limit").value = `₹${Number(currentLimit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+    this.openModal("inspect-mandate-modal");
   }
 
   async handleCreateCustomer() {
