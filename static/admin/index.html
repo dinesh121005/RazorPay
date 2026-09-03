@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/static/admin/style.css?v=6.0">
+  <link rel="stylesheet" href="/static/admin/style.css?v=6.5">
 </head>
 <body>
   <!-- Header Bar -->
@@ -198,34 +198,9 @@
           </div>
         </div>
 
-        <div class="overview-lower mt-6">
-          <aside class="card integrity-card" aria-label="System integrity status">
-            <div class="card-header">
-              <div>
-                <p class="card-eyebrow">System health</p>
-                <h3 class="card-title">Protected by design</h3>
-              </div>
-              <span class="integrity-mark" aria-label="All systems operational">✓</span>
-            </div>
-            <div class="integrity-list">
-              <div>
-                <span class="integrity-dot"></span>
-                <div><strong>Policy controls</strong><small>Every proposal is evaluated before execution.</small></div>
-              </div>
-              <div>
-                <span class="integrity-dot"></span>
-                <div><strong>Audit ledger</strong><small>Decisions and payment references are retained.</small></div>
-              </div>
-              <div>
-                <span class="integrity-dot"></span>
-                <div><strong>Payment rails</strong><small>Connected in Razorpay test mode.</small></div>
-              </div>
-            </div>
-          </aside>
-
-          <!-- Recent Audit Entries -->
-          <div class="card recent-card">
-            <div class="card-header">
+        <!-- Recent Live Ledger Transactions (Full-Width View) -->
+        <div class="card mt-6">
+          <div class="card-header">
               <div>
                 <p class="card-eyebrow">Live ledger</p>
                 <h3 class="card-title">Recent transactions</h3>
@@ -252,7 +227,6 @@
               </table>
             </div>
           </div>
-        </div>
       </section>
 
       <!-- TAB: ANALYTICS & INSIGHTS (PRO TELEMETRY) -->
@@ -680,6 +654,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- Main JavaScript App & Razorpay Checkout SDK -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="/static/admin/app.js?v=6.0"></script>
+  <script src="/static/admin/app.js?v=6.5"></script>
 </body>
 </html>
