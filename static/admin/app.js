@@ -362,7 +362,7 @@ class AdminDashboard {
           const payBadge = isCaptured
             ? `<span class="badge badge-success">✓ PAID</span>`
             : isAutoPaid
-            ? `<span class="badge badge-success" style="background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #10b981; font-weight: 600;" title="Auto-Debited & Settled from Customer Policy Mandate">⚡ AUTO-PAID</span>`
+            ? `<span class="badge badge-autopay" title="Auto-Debited & Settled from Customer Policy Mandate">⚡ AUTO-PAID</span>`
             : r.payment_status === "created"
             ? `<span class="badge badge-warning">⏳ PENDING</span>`
             : r.payment_status === "failed"
@@ -429,7 +429,7 @@ class AdminDashboard {
         const payBadge = isCaptured
           ? `<span class="badge badge-success">✓ PAID</span>`
           : isAutoPaid
-          ? `<span class="badge badge-success" style="background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #10b981; font-weight: 600;" title="Auto-Debited & Settled from Customer Policy Mandate">⚡ AUTO-PAID</span>`
+          ? `<span class="badge badge-autopay" title="Auto-Debited & Settled from Customer Policy Mandate">⚡ AUTO-PAID</span>`
           : r.payment_status === "created"
           ? `<span class="badge badge-warning">⏳ PENDING</span>`
           : r.payment_status === "failed"
