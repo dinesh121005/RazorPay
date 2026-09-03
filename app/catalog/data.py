@@ -249,7 +249,7 @@ PRODUCTS: List[Product] = [
         category="food",
         merchant_id="MERCH_FOOD",
         price=199.0,
-        stock=0,
+        stock=1,
         description="GI-tagged authentic Kovilpatti peanut brittle made with slow-roasted groundnuts, pure organic sugarcane jaggery syrup, and crushed cardamom."
     ),
     Product(

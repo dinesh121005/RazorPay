@@ -27,8 +27,9 @@ GOOGLE_REDIRECT_URI = os.getenv(
 
 ALLOWED_REDIRECT_URIS: Set[str] = {
     "https://claude.ai/api/mcp/oauth_callback",
-    "https://claude.ai/api/mcp/oauth/callback",
     "https://claude.ai/oauth/callback",
+    "https://chatgpt.com/api/aip/v1/auth/oauth/callback",
+    "https://chat.openai.com/aip/v1/auth/oauth/callback",
     "http://localhost:8000/oauth/callback",
     "https://localhost:8000/oauth/callback",
     "http://127.0.0.1:8000/oauth/callback",
@@ -47,7 +48,13 @@ def is_allowed_redirect_uri(redirect_uri: Optional[str]) -> bool:
     try:
         parsed = urlparse(redirect_uri)
         netloc = parsed.netloc.lower()
-        if netloc in ("claude.ai", "www.claude.ai", "staging.claude.ai", "localhost", "127.0.0.1") or netloc.endswith(".claude.ai") or netloc.endswith(".anthropic.com"):
+        if (
+            netloc in ("claude.ai", "www.claude.ai", "staging.claude.ai", "chatgpt.com", "chat.openai.com", "localhost", "127.0.0.1")
+            or netloc.endswith(".claude.ai")
+            or netloc.endswith(".anthropic.com")
+            or netloc.endswith(".openai.com")
+            or netloc.endswith(".chatgpt.com")
+        ):
             return True
         if netloc.startswith("localhost:") or netloc.startswith("127.0.0.1:"):
             return True

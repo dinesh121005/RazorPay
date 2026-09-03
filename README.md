@@ -146,6 +146,23 @@ The gateway exposes a comprehensive suite of **8 MCP tools** (plus identity reso
 
 ## 🚀 Step-by-Step AI Client Setup Guide
 
+### 🔐 Gateway OAuth 2.1 Client Credentials & Endpoints
+
+When connecting any external AI agent client (such as **Claude.ai**, **ChatGPT Custom Actions**, **Cursor**, or custom agent frameworks) using OAuth 2.0 / 2.1, use the following configuration parameters:
+
+| Parameter | Value | Description |
+|---|---|---|
+| **Client ID** | `claude-desktop-client` | Authorized Gateway Client Identifier |
+| **Client Secret** | `claude-demo-secret` | Gateway Client Secret (Basic or Post) |
+| **Authorization URL** | `https://razorpay-c454.onrender.com/oauth/authorize` | User Login, SSO & Authorization Consent Form |
+| **Token URL** | `https://razorpay-c454.onrender.com/oauth/token` | Exchange Authorization Code for JWT Access Token |
+| **Scope** | `purchase` | Required scope for AI buyer procurement |
+| **Token Auth Method** | `client_secret_post` / `client_secret_basic` | Supports both HTTP Basic Auth & Form POST body |
+| **RFC 8414 Discovery** | `https://razorpay-c454.onrender.com/.well-known/oauth-authorization-server` | Open discovery metadata for compliant clients |
+| **OpenAPI Specification** | `https://razorpay-c454.onrender.com/openapi.json` | Full schema for ChatGPT Actions / REST Agents |
+
+---
+
 ### Method A: Connect with Claude.ai (Web Remote MCP via OAuth)
 
 1. Open **[Claude.ai](https://claude.ai)** and navigate to **Settings** ➔ **Integrations / Connectors** (or **Custom Connectors**).
@@ -153,14 +170,37 @@ The gateway exposes a comprehensive suite of **8 MCP tools** (plus identity reso
    - **Server Name**: `RazorPay-Merchant`
    - **Server URL**: `https://razorpay-c454.onrender.com/mcp`
 3. Click **Connect / Sign In**:
-   - Claude opens the OAuth login portal (`https://razorpay-c454.onrender.com/oauth/authorize`).
+   - Claude auto-discovers endpoints using RFC 8414 and opens the OAuth login portal (`https://razorpay-c454.onrender.com/oauth/authorize`).
+   - *(If Claude's connector setup asks for Client ID & Secret manually: enter `claude-desktop-client` and `claude-demo-secret`).*
    - Log in with demo credentials (Username: `dinesh`, Password: `password123`), use **Continue with Google**, or create a new account.
    - Click **Authorize Claude**.
 4. Claude now has access to all 8 gateway MCP tools with authenticated identity bound directly to your user account.
 
 ---
 
-### Method B: Connect with Claude Desktop (Local Stdio MCP)
+### Method B: Connect with ChatGPT (Custom GPTs / OpenAI Actions)
+
+You can also transact through ChatGPT by creating a Custom GPT with OpenAI Actions:
+
+1. In ChatGPT, open the **GPT Builder** (or **Explore GPTs** ➔ **Create**).
+2. Under **Configure**, click **Create new action**.
+3. In the **Schema** box, select **Import from URL** and enter:
+   ```
+   https://razorpay-c454.onrender.com/openapi.json
+   ```
+4. In the **Authentication** section:
+   - **Authentication Type**: Select `OAuth`.
+   - **Client ID**: `claude-desktop-client`
+   - **Client Secret**: `claude-demo-secret`
+   - **Authorization URL**: `https://razorpay-c454.onrender.com/oauth/authorize`
+   - **Token URL**: `https://razorpay-c454.onrender.com/oauth/token`
+   - **Scope**: `purchase`
+   - **Token Exchange Method**: Default (`POST` or `Basic`).
+5. Save the Action. When you chat with your Custom GPT, ChatGPT will prompt you to authenticate via the Gateway portal and gain authorized access to live catalog search, policy proposals, and order tracking.
+
+---
+
+### Method C: Connect with Claude Desktop (Local Stdio MCP)
 
 1. Open your Claude Desktop configuration file:
    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
