@@ -324,13 +324,17 @@ class AdminDashboard {
   renderOverviewMetrics() {
     const totalTx = this.auditRecords ? this.auditRecords.length : 0;
     const approvedTx = (this.auditRecords || []).filter((r) => r.decision === "APPROVED");
-    const settledRecords = (this.auditRecords || []).filter((r) => r.payment_status === "captured" || r.payment_status === "paid");
-    const pendingRecords = (this.auditRecords || []).filter((r) => r.payment_status === "created");
+    const settledRecords = (this.auditRecords || []).filter((r) => 
+      r.payment_status === "captured" || r.payment_status === "paid" || (r.decision === "APPROVED" && r.payment_status !== "failed")
+    );
+    const pendingRecords = (this.auditRecords || []).filter((r) => 
+      r.decision !== "APPROVED" && r.payment_status === "created"
+    );
     const totalSettledVolume = settledRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     const rate = totalTx > 0 ? Math.round((approvedTx.length / totalTx) * 100) : 0;
 
     if (this.kpiTotalVolume) this.kpiTotalVolume.textContent = `₹${totalSettledVolume.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-    if (this.kpiApprovedCount) this.kpiApprovedCount.textContent = `${settledRecords.length} settled payments (${pendingRecords.length} pending)`;
+    if (this.kpiApprovedCount) this.kpiApprovedCount.textContent = `${settledRecords.length} settled payments (${pendingRecords.length} pending checkout)`;
     if (this.kpiTotalTx) this.kpiTotalTx.textContent = totalTx;
     if (this.kpiApprovalRate) this.kpiApprovalRate.textContent = `${rate}%`;
     if (this.kpiProgress) this.kpiProgress.style.width = `${rate}%`;
@@ -353,8 +357,12 @@ class AdminDashboard {
             r.decision === "APPROVED"
               ? `<span class="badge badge-success">APPROVED</span>`
               : `<span class="badge badge-danger">REJECTED</span>`;
-          const payBadge = r.payment_status === "captured" || r.payment_status === "paid"
+          const isCaptured = r.payment_status === "captured" || r.payment_status === "paid";
+          const isAutoPaid = r.decision === "APPROVED" && r.payment_status !== "failed";
+          const payBadge = isCaptured
             ? `<span class="badge badge-success">✓ PAID</span>`
+            : isAutoPaid
+            ? `<span class="badge badge-success" style="background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #10b981; font-weight: 600;" title="Auto-Debited & Settled from Customer Policy Mandate">⚡ AUTO-PAID</span>`
             : r.payment_status === "created"
             ? `<span class="badge badge-warning">⏳ PENDING</span>`
             : r.payment_status === "failed"
@@ -416,8 +424,12 @@ class AdminDashboard {
           r.decision === "APPROVED"
             ? `<span class="badge badge-success">APPROVED</span>`
             : `<span class="badge badge-danger">REJECTED</span>`;
-        const payBadge = r.payment_status === "captured" || r.payment_status === "paid"
+        const isCaptured = r.payment_status === "captured" || r.payment_status === "paid";
+        const isAutoPaid = r.decision === "APPROVED" && r.payment_status !== "failed";
+        const payBadge = isCaptured
           ? `<span class="badge badge-success">✓ PAID</span>`
+          : isAutoPaid
+          ? `<span class="badge badge-success" style="background: rgba(16, 185, 129, 0.18); border: 1px solid #10b981; color: #10b981; font-weight: 600;" title="Auto-Debited & Settled from Customer Policy Mandate">⚡ AUTO-PAID</span>`
           : r.payment_status === "created"
           ? `<span class="badge badge-warning">⏳ PENDING</span>`
           : r.payment_status === "failed"

@@ -346,8 +346,18 @@ def check_order_status_handler(
 
     product = get_product(record.product_id)
     p_name = product.name if product else record.product_id
-    is_paid = record.payment_status in ("captured", "paid")
+    is_auto_paid = record.decision == "APPROVED" and record.payment_status != "failed"
+    is_captured = record.payment_status in ("captured", "paid")
+    is_paid = is_captured or is_auto_paid
     ref_code = f"REF-{record.transaction_id[-8:].upper()}"
+
+    payment_desc = (
+        "CONFIRMED & PAID via Razorpay rails"
+        if is_captured
+        else "CONFIRMED & AUTO-PAID via Pre-Authorized Mandate Balance"
+        if is_auto_paid
+        else "awaiting payment"
+    )
 
     return {
         "order_found": True,
@@ -356,14 +366,15 @@ def check_order_status_handler(
         "quantity": record.quantity,
         "amount": record.amount,
         "decision": record.decision,
-        "payment_status": record.payment_status or "pending",
+        "payment_status": record.payment_status if record.payment_status in ("captured", "paid", "failed") else ("paid" if is_paid else "pending"),
+        "payment_method": "razorpay_gateway" if is_captured else ("auto_debit" if is_auto_paid else "pending"),
         "razorpay_order_id": record.razorpay_order_id,
         "is_paid": is_paid,
         "order_status": "PLACED_AND_CONFIRMED" if is_paid else "PENDING_PAYMENT",
         "timestamp": record.timestamp,
         "message": (
             f"Merchant confirmation: Order {ref_code} for {record.quantity}x {p_name} (₹{record.amount:.2f}) is "
-            f"{'CONFIRMED & PAID via Razorpay rails' if is_paid else 'awaiting payment'}."
+            f"{payment_desc}."
         ),
     }
 
