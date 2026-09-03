@@ -56,6 +56,13 @@ def get_admin_dashboard():
     return FileResponse(html_path)
 
 
+@app.get("/checkout", tags=["payment"], summary="User Self-Checkout UI")
+def get_checkout_page():
+    """Serves the standalone Razorpay self-checkout page."""
+    html_path = os.path.join(static_dir, "checkout", "index.html")
+    return FileResponse(html_path)
+
+
 @app.get("/admin", tags=["admin"], summary="Admin Web Dashboard Redirect")
 def redirect_to_dashboard():
     """Redirects /admin to the Admin Web Dashboard."""

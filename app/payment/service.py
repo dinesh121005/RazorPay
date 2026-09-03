@@ -59,6 +59,9 @@ def execute_auto_debit(
     )
 
 
+import urllib.parse
+
+
 def create_payment_link_for_manual(
     amount_inr: float,
     receipt: str,
@@ -67,54 +70,32 @@ def create_payment_link_for_manual(
     product_name: Optional[str] = None,
 ) -> PaymentResult:
     """
-    Creates a real Razorpay Payment Link and dynamic UPI QR Code for user self-checkout
+    Creates a dedicated Hosted Checkout Link and dynamic UPI QR Code for user self-checkout
     when a purchase is not approved for auto-debit by policy mandate.
     """
-    amount_paise = _rupees_to_paise(amount_inr)
     name = product_name or product_id
-    description = f"Purchase: {name} (₹{amount_inr:.2f})"
-    notes = {
-        "customer_id": customer_id,
-        "product_id": product_id,
-        "transaction_id": receipt,
-        "gateway": "ai-buyer-gateway",
-    }
+    base_url = os.environ.get("BASE_URL", "https://razorpay-c454.onrender.com").rstrip("/")
+    key_id = os.environ.get("RAZORPAY_KEY_ID", "rzp_test_51tPkUG58N7Lkg")
 
-    try:
-        # 1. Try to create official Razorpay Payment Link via SDK
-        response = razorpay_client.create_payment_link(
-            amount_paise=amount_paise,
-            receipt=receipt,
-            description=description,
-            notes=notes,
-        )
-        short_url = response.get("short_url") or f"https://rzp.io/i/{receipt[:12]}"
-        link_id = response.get("id") or f"plink_{receipt[:16]}"
-        qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={short_url}"
+    # Build Hosted Checkout URL
+    query = urllib.parse.urlencode({
+        "order_id": f"order_{receipt.replace('-', '')[:16]}",
+        "amount": f"{amount_inr:.2f}",
+        "product": name,
+        "key": key_id,
+        "customer": customer_id,
+        "receipt": receipt,
+    })
+    checkout_url = f"{base_url}/checkout?{query}"
+    qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(checkout_url)}"
 
-        return PaymentResult(
-            status="created",
-            razorpay_order_id=link_id,
-            payment_url=short_url,
-            qr_code_url=qr_code_url,
-            payment_method="razorpay_link",
-        )
-    except Exception as exc:
-        logger.warning(
-            "Razorpay payment link creation failed or SDK credentials not configured for receipt %s: %s. Creating hosted fallback link.",
-            receipt,
-            exc,
-        )
-        # Resilient fallback link and QR code for sandbox and offline testing
-        fallback_url = f"https://rzp.io/i/{receipt[:12]}"
-        qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={fallback_url}"
-        return PaymentResult(
-            status="created",
-            razorpay_order_id=f"link_{receipt[:16]}",
-            payment_url=fallback_url,
-            qr_code_url=qr_code_url,
-            payment_method="razorpay_link",
-        )
+    return PaymentResult(
+        status="created",
+        razorpay_order_id=f"order_{receipt.replace('-', '')[:16]}",
+        payment_url=checkout_url,
+        qr_code_url=qr_code_url,
+        payment_method="razorpay_link",
+    )
 
 
 def create_order_for_approved(
