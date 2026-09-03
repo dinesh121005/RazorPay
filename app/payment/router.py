@@ -27,11 +27,59 @@ def get_webhook_secret() -> str:
     return os.environ.get("RAZORPAY_WEBHOOK_SECRET", "dev-webhook-secret")
 
 
+from uuid import uuid4
+
+
+class CreateOrderRequest(BaseModel):
+    """Payload to create an official Razorpay order for client checkout."""
+    amount: float = Field(..., description="Amount in INR")
+    receipt: Optional[str] = Field(None, description="Transaction receipt / ID")
+    product_name: Optional[str] = Field(None, description="Product Name")
+    customer_id: Optional[str] = Field(None, description="Customer ID")
+
+
+@router.post(
+    "/create-order",
+    status_code=status.HTTP_200_OK,
+    summary="Create a real Razorpay Order for client checkout",
+)
+def create_checkout_order(payload: CreateOrderRequest):
+    """
+    Creates an official Razorpay Order for frontend client checkout.
+    """
+    receipt = payload.receipt or f"chk_{uuid4().hex[:12]}"
+    amount_paise = int(round(payload.amount * 100))
+    notes = {
+        "transaction_id": receipt,
+        "product_name": payload.product_name or "Custom Purchase",
+        "customer_id": payload.customer_id or "CUST001",
+    }
+    key_id = os.environ.get("RAZORPAY_KEY_ID", "rzp_test_51tPkUG58N7Lkg")
+    try:
+        from app.payment.razorpay_client import create_order
+        res = create_order(amount_paise=amount_paise, receipt=receipt, notes=notes)
+        return {
+            "order_id": res.get("id"),
+            "amount": payload.amount,
+            "currency": "INR",
+            "key_id": key_id,
+        }
+    except Exception as e:
+        logger.warning("Could not create Razorpay order for checkout: %s", e)
+        return {
+            "order_id": None,
+            "amount": payload.amount,
+            "currency": "INR",
+            "key_id": key_id,
+        }
+
+
 class PaymentVerificationRequest(BaseModel):
     """Payload for client-side payment signature verification."""
     razorpay_order_id: str = Field(..., description="Razorpay order ID")
     razorpay_payment_id: str = Field(..., description="Razorpay payment ID returned after checkout")
     razorpay_signature: str = Field(..., description="HMAC-SHA256 signature returned by Razorpay Checkout")
+    receipt: Optional[str] = Field(None, description="Internal transaction receipt / ID")
 
 
 @router.post(
@@ -53,6 +101,17 @@ def verify_payment(payload: PaymentVerificationRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid Razorpay payment signature",
         )
+    
+    # If transaction receipt exists, update the ledger immediately
+    if payload.receipt:
+        record = audit_store.get(payload.receipt)
+        if record:
+            audit_store.update_payment_outcome(
+                transaction_id=payload.receipt,
+                payment_status="captured",
+                razorpay_order_id=payload.razorpay_order_id or payload.razorpay_payment_id,
+            )
+
     return {
         "verified": True,
         "razorpay_order_id": payload.razorpay_order_id,

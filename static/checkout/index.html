@@ -201,23 +201,57 @@
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get("order_id") || "order_demo";
     const amount = parseFloat(urlParams.get("amount")) || 4999.0;
     const productName = urlParams.get("product") || "27-inch 4K UHD Monitor";
-    const keyId = urlParams.get("key") || "rzp_test_51tPkUG58N7Lkg";
+    const receipt = urlParams.get("receipt") || urlParams.get("tx") || "";
+    const customer = urlParams.get("customer") || "CUST001";
+    let keyId = urlParams.get("key") || "rzp_test_51tPkUG58N7Lkg";
 
     document.getElementById("disp-product").textContent = productName;
-    document.getElementById("disp-order-id").textContent = orderId;
+    document.getElementById("disp-order-id").textContent = receipt ? `TX-${receipt.slice(-8).toUpperCase()}` : "Dynamic";
     document.getElementById("disp-amount").textContent = `₹${amount.toFixed(2)}`;
 
-    document.getElementById("pay-button").addEventListener("click", () => {
+    const payBtn = document.getElementById("pay-button");
+
+    payBtn.addEventListener("click", async () => {
+      payBtn.disabled = true;
+      const originalText = payBtn.innerHTML;
+      payBtn.innerHTML = `<span>⏳</span> Connecting to Razorpay Rails...`;
+
+      let realOrderId = null;
+
+      try {
+        // Create an official Razorpay Order on the backend
+        const res = await fetch("/payment/create-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: amount,
+            product_name: productName,
+            receipt: receipt,
+            customer_id: customer,
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.order_id) realOrderId = data.order_id;
+          if (data.key_id) keyId = data.key_id;
+        }
+      } catch (e) {
+        console.warn("Using direct client checkout mode:", e);
+      } finally {
+        payBtn.disabled = false;
+        payBtn.innerHTML = originalText;
+      }
+
       const options = {
         key: keyId,
         amount: Math.round(amount * 100),
         currency: "INR",
         name: "Agentic Commerce Gateway",
         description: `Purchase: ${productName}`,
-        order_id: orderId.startsWith("order_") ? orderId : undefined,
+        order_id: realOrderId ? realOrderId : undefined,
         prefill: {
           name: "Dinesh Kumar",
           email: "dinesh@example.com",
@@ -227,26 +261,30 @@
         handler: async function (response) {
           try {
             // Verify signature on backend
-            if (response.razorpay_signature) {
-              await fetch("/payment/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  razorpay_order_id: response.razorpay_order_id || orderId,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                })
-              });
-            }
+            await fetch("/payment/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id || realOrderId || "order_client",
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature || "test_sig",
+                receipt: receipt,
+              })
+            });
           } catch (e) {
-            console.warn("Signature verification ping completed");
+            console.warn("Signature verification ping completed:", e);
           }
 
           // Show success screen
           document.getElementById("payment-form-section").style.display = "none";
           document.getElementById("payment-success-section").style.display = "block";
           document.getElementById("res-payment-id").textContent = response.razorpay_payment_id || "pay_success";
-          document.getElementById("res-order-id").textContent = response.razorpay_order_id || orderId;
+          document.getElementById("res-order-id").textContent = response.razorpay_order_id || realOrderId || "order_direct";
+        },
+        modal: {
+          ondismiss: function() {
+            console.log("Checkout modal dismissed by user");
+          }
         }
       };
 
