@@ -136,8 +136,8 @@ def get_authorize_page(
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #111827 100%);
-            color: #f8fafc;
+            background: #F8FAFC;
+            color: #0F172A;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -145,12 +145,10 @@ def get_authorize_page(
             padding: 1.5rem;
         }}
         .card {{
-            background: rgba(30, 41, 59, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
             border-radius: 18px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(56, 189, 248, 0.06);
+            box-shadow: 0 10px 25px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
             width: 100%;
             max-width: 420px;
             padding: 2.2rem;
@@ -165,12 +163,12 @@ def get_authorize_page(
             width: 48px;
             height: 48px;
             border-radius: 12px;
-            background: linear-gradient(135deg, #0284c7, #3b82f6);
+            background: linear-gradient(135deg, #4F46E5, #2563EB);
             margin-bottom: 0.8rem;
-            box-shadow: 0 8px 16px rgba(2, 132, 199, 0.3);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
         }}
-        h2 {{ color: #f8fafc; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }}
-        .subtitle {{ color: #94a3b8; font-size: 0.88rem; margin-top: 0.3rem; line-height: 1.4; }}
+        h2 {{ color: #0F172A; font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }}
+        .subtitle {{ color: #64748B; font-size: 0.88rem; margin-top: 0.3rem; line-height: 1.4; }}
         
         .btn-google {{
             display: flex;
@@ -179,20 +177,22 @@ def get_authorize_page(
             gap: 0.75rem;
             width: 100%;
             padding: 0.75rem 1rem;
-            background: #ffffff;
-            color: #1f2937;
+            background: #FFFFFF;
+            color: #0F172A;
             font-size: 0.92rem;
             font-weight: 600;
+            border: 1px solid #E2E8F0;
             border-radius: 10px;
             text-decoration: none;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
             margin-bottom: 1.4rem;
         }}
         .btn-google:hover {{
-            background: #f1f5f9;
+            background: #F8FAFC;
+            border-color: #CBD5E1;
             transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
         }}
         
         .divider {{
@@ -200,7 +200,7 @@ def get_authorize_page(
             align-items: center;
             text-align: center;
             margin: 1.2rem 0;
-            color: #64748b;
+            color: #64748B;
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -208,24 +208,24 @@ def get_authorize_page(
         .divider::before, .divider::after {{
             content: '';
             flex: 1;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #E2E8F0;
         }}
         .divider span {{ padding: 0 0.8rem; }}
         
         .tabs {{
             display: flex;
-            background: #0f172a;
+            background: #F1F5F9;
             border-radius: 10px;
             padding: 4px;
             margin-bottom: 1.4rem;
-            border: 1px solid #334155;
+            border: 1px solid #E2E8F0;
         }}
         .tab-btn {{
             flex: 1;
             padding: 0.5rem;
             background: transparent;
             border: none;
-            color: #94a3b8;
+            color: #64748B;
             font-size: 0.85rem;
             font-weight: 600;
             border-radius: 8px;
@@ -233,33 +233,33 @@ def get_authorize_page(
             transition: all 0.2s ease;
         }}
         .tab-btn.active {{
-            background: #3b82f6;
-            color: #ffffff;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+            background: #4F46E5;
+            color: #FFFFFF;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
         }}
         
         .form-group {{ margin-bottom: 1rem; }}
-        label {{ display: block; margin-bottom: 0.35rem; color: #cbd5e1; font-size: 0.82rem; font-weight: 500; }}
+        label {{ display: block; margin-bottom: 0.35rem; color: #0F172A; font-size: 0.82rem; font-weight: 600; }}
         input[type="text"], input[type="email"], input[type="password"] {{
             width: 100%;
             padding: 0.65rem 0.85rem;
-            border: 1px solid #334155;
+            border: 1px solid #E2E8F0;
             border-radius: 8px;
-            background: #0f172a;
-            color: #f8fafc;
+            background: #FFFFFF;
+            color: #0F172A;
             font-size: 0.9rem;
             outline: none;
             transition: border-color 0.2s, box-shadow 0.2s;
         }}
         input:focus {{
-            border-color: #38bdf8;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+            border-color: #4F46E5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
         }}
         
         .btn-submit {{
             width: 100%;
             padding: 0.75rem;
-            background: linear-gradient(135deg, #0284c7, #2563eb);
+            background: #4F46E5;
             border: none;
             border-radius: 9px;
             color: white;
@@ -267,26 +267,26 @@ def get_authorize_page(
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
             margin-top: 0.5rem;
         }}
         .btn-submit:hover {{
-            background: linear-gradient(135deg, #0369a1, #1d4ed8);
+            background: #4338CA;
             transform: translateY(-1px);
         }}
         
         .info-pill {{
             margin-top: 1.2rem;
             padding: 0.7rem 0.9rem;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px dashed #334155;
+            background: #F8FAFC;
+            border: 1px dashed #CBD5E1;
             border-radius: 8px;
             font-size: 0.78rem;
-            color: #94a3b8;
+            color: #64748B;
             line-height: 1.4;
         }}
-        .info-pill strong {{ color: #e2e8f0; }}
-        .badge-mandate {{ color: #38bdf8; font-weight: 600; }}
+        .info-pill strong {{ color: #0F172A; }}
+        .badge-mandate {{ color: #4F46E5; font-weight: 700; }}
     </style>
 </head>
 <body>
@@ -585,9 +585,9 @@ async def google_callback(
     except Exception as e:
         logger.error("Unexpected error in google_callback: %s", e, exc_info=True)
         return HTMLResponse(
-            f"""<!DOCTYPE html><html><body style="font-family:sans-serif;background:#0d1117;color:#f0f6fc;padding:40px;">
-            <h2>Google Sign-In Error</h2><p style="color:#f85149;">{html.escape(str(e))}</p>
-            <p><a href="/oauth/authorize?client_id=claude-desktop-client" style="color:#58a6ff;">Return to Sign In</a></p>
+            f"""<!DOCTYPE html><html><body style="font-family:'Inter',sans-serif;background:#F8FAFC;color:#0F172A;padding:40px;">
+            <h2>Google Sign-In Error</h2><p style="color:#DC2626;">{html.escape(str(e))}</p>
+            <p><a href="/oauth/authorize?client_id=claude-desktop-client" style="color:#4F46E5;">Return to Sign In</a></p>
             </body></html>""",
             status_code=500
         )

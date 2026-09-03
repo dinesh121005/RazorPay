@@ -520,14 +520,14 @@ class AdminDashboard {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Glowing vertical gradients
+    // Clean gradients
     const totalGrad = ctx.createLinearGradient(0, 0, 0, 220);
-    totalGrad.addColorStop(0, "rgba(56, 189, 248, 0.32)");
-    totalGrad.addColorStop(1, "rgba(56, 189, 248, 0.0)");
+    totalGrad.addColorStop(0, "rgba(79, 70, 229, 0.18)");
+    totalGrad.addColorStop(1, "rgba(79, 70, 229, 0.0)");
 
     const aiGrad = ctx.createLinearGradient(0, 0, 0, 220);
-    aiGrad.addColorStop(0, "rgba(167, 139, 250, 0.36)");
-    aiGrad.addColorStop(1, "rgba(167, 139, 250, 0.0)");
+    aiGrad.addColorStop(0, "rgba(37, 99, 235, 0.18)");
+    aiGrad.addColorStop(1, "rgba(37, 99, 235, 0.0)");
 
     try {
       this.revenueChartInstance = new Chart(ctx, {
@@ -538,13 +538,13 @@ class AdminDashboard {
             {
               label: "AI Revenue",
               data: aiData,
-              borderColor: "#A78BFA",
+              borderColor: "#2563EB",
               backgroundColor: aiGrad,
               borderWidth: 2.8,
               tension: 0.35,
               fill: true,
-              pointBackgroundColor: "#8B5CF6",
-              pointBorderColor: "#FFF",
+              pointBackgroundColor: "#2563EB",
+              pointBorderColor: "#FFFFFF",
               pointBorderWidth: 1.5,
               pointRadius: 4,
               pointHoverRadius: 7,
@@ -552,13 +552,13 @@ class AdminDashboard {
             {
               label: "Total Revenue",
               data: totalData,
-              borderColor: "#38BDF8",
+              borderColor: "#4F46E5",
               backgroundColor: totalGrad,
               borderWidth: 2.8,
               tension: 0.35,
               fill: true,
-              pointBackgroundColor: "#0284C7",
-              pointBorderColor: "#FFF",
+              pointBackgroundColor: "#4F46E5",
+              pointBorderColor: "#FFFFFF",
               pointBorderWidth: 1.5,
               pointRadius: 4,
               pointHoverRadius: 7,
@@ -580,7 +580,7 @@ class AdminDashboard {
               backgroundColor: "rgba(15, 23, 42, 0.95)",
               titleColor: "#F8FAFC",
               bodyColor: "#E2E8F0",
-              borderColor: "rgba(255, 255, 255, 0.12)",
+              borderColor: "#E2E8F0",
               borderWidth: 1,
               padding: 10,
               displayColors: true,
@@ -601,10 +601,10 @@ class AdminDashboard {
           scales: {
             x: {
               grid: {
-                color: "rgba(255, 255, 255, 0.05)",
+                color: "#E2E8F0",
               },
               ticks: {
-                color: "#94A3B8",
+                color: "#64748B",
                 font: {
                   family: "Inter, sans-serif",
                   size: 10,
@@ -614,10 +614,10 @@ class AdminDashboard {
             },
             y: {
               grid: {
-                color: "rgba(255, 255, 255, 0.05)",
+                color: "#E2E8F0",
               },
               ticks: {
-                color: "#94A3B8",
+                color: "#64748B",
                 font: {
                   family: "Inter, sans-serif",
                   size: 11,
@@ -755,12 +755,12 @@ class AdminDashboard {
     if (!ctx) return;
 
     const totalGrad = ctx.createLinearGradient(0, 0, 0, 260);
-    totalGrad.addColorStop(0, "rgba(56, 189, 248, 0.35)");
-    totalGrad.addColorStop(1, "rgba(56, 189, 248, 0.0)");
+    totalGrad.addColorStop(0, "rgba(79, 70, 229, 0.18)");
+    totalGrad.addColorStop(1, "rgba(79, 70, 229, 0.0)");
 
     const aiGrad = ctx.createLinearGradient(0, 0, 0, 260);
-    aiGrad.addColorStop(0, "rgba(167, 139, 250, 0.38)");
-    aiGrad.addColorStop(1, "rgba(167, 139, 250, 0.0)");
+    aiGrad.addColorStop(0, "rgba(37, 99, 235, 0.18)");
+    aiGrad.addColorStop(1, "rgba(37, 99, 235, 0.0)");
 
     try {
       this.analyticsTimelineChartInstance = new Chart(ctx, {
@@ -771,24 +771,24 @@ class AdminDashboard {
             {
               label: "Cumulative Settled",
               data: totalData,
-              borderColor: "#38BDF8",
+              borderColor: "#4F46E5",
               backgroundColor: totalGrad,
               borderWidth: 2.5,
               tension: 0.35,
               fill: true,
-              pointBackgroundColor: "#0284C7",
+              pointBackgroundColor: "#4F46E5",
               pointRadius: 4,
               pointHoverRadius: 7,
             },
             {
               label: "AI Food & Concierge",
               data: aiData,
-              borderColor: "#A78BFA",
+              borderColor: "#2563EB",
               backgroundColor: aiGrad,
               borderWidth: 2.5,
               tension: 0.35,
               fill: true,
-              pointBackgroundColor: "#8B5CF6",
+              pointBackgroundColor: "#2563EB",
               pointRadius: 4,
               pointHoverRadius: 7,
             },
@@ -802,7 +802,7 @@ class AdminDashboard {
             legend: { display: false },
             tooltip: {
               backgroundColor: "rgba(15, 23, 42, 0.95)",
-              borderColor: "rgba(255, 255, 255, 0.12)",
+              borderColor: "#E2E8F0",
               borderWidth: 1,
               callbacks: {
                 label: function (ctx) {
@@ -813,13 +813,13 @@ class AdminDashboard {
           },
           scales: {
             x: {
-              grid: { color: "rgba(255, 255, 255, 0.05)" },
-              ticks: { color: "#94A3B8", font: { size: 10 }, maxRotation: 45 },
+              grid: { color: "#E2E8F0" },
+              ticks: { color: "#64748B", font: { size: 10 }, maxRotation: 45 },
             },
             y: {
-              grid: { color: "rgba(255, 255, 255, 0.05)" },
+              grid: { color: "#E2E8F0" },
               ticks: {
-                color: "#94A3B8",
+                color: "#64748B",
                 callback: function (v) { return v >= 1000 ? `₹${Math.round(v/1000)}k` : `₹${v}`; },
               },
             },
@@ -851,8 +851,8 @@ class AdminDashboard {
           datasets: [
             {
               data: [autoPayCount, humanGatedCount],
-              backgroundColor: ["#10B981", "#8B5CF6"],
-              borderColor: "rgba(16, 23, 38, 0.9)",
+              backgroundColor: ["#059669", "#4F46E5"],
+              borderColor: "#FFFFFF",
               borderWidth: 3,
               hoverOffset: 6,
             },
@@ -864,7 +864,7 @@ class AdminDashboard {
           plugins: {
             legend: {
               position: "bottom",
-              labels: { color: "#94A3B8", font: { size: 11 }, padding: 15 },
+              labels: { color: "#64748B", font: { size: 11 }, padding: 15 },
             },
             tooltip: {
               backgroundColor: "rgba(15, 23, 42, 0.95)",
@@ -906,8 +906,8 @@ class AdminDashboard {
           datasets: [
             {
               data: [approvedCount, rejectedCount, pendingCount],
-              backgroundColor: ["#10B981", "#EF4444", "#F59E0B"],
-              borderColor: "rgba(16, 23, 38, 0.9)",
+              backgroundColor: ["#059669", "#DC2626", "#D97706"],
+              borderColor: "#FFFFFF",
               borderWidth: 3,
               hoverOffset: 6,
             },
@@ -919,7 +919,7 @@ class AdminDashboard {
           plugins: {
             legend: {
               position: "bottom",
-              labels: { color: "#94A3B8", font: { size: 11 }, padding: 15 },
+              labels: { color: "#64748B", font: { size: 11 }, padding: 15 },
             },
             tooltip: {
               backgroundColor: "rgba(15, 23, 42, 0.95)",
