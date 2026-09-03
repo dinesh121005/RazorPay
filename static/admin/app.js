@@ -30,10 +30,7 @@ class AdminDashboard {
   }
 
   initElements() {
-    // Navigation & Sidebar
-    this.sidebar = document.getElementById("sidebar");
-    this.sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
-    this.sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
+    // Navigation
     this.contentArea = document.querySelector(".content-area");
     this.navItems = document.querySelectorAll(".nav-item");
     this.tabPanes = document.querySelectorAll(".tab-pane");
@@ -100,31 +97,6 @@ class AdminDashboard {
         const tab = btn.getAttribute("data-goto-tab");
         this.switchTab(tab);
       });
-    });
-
-    // Sidebar Sliding & Collapsing (Click + Ctrl/Cmd+B shortcut)
-    // Opens expanded by default for clean visual hierarchy
-    if (this.sidebar) {
-      this.sidebar.classList.remove("collapsed");
-    }
-
-    const toggleSidebar = () => {
-      if (!this.sidebar) return;
-      this.sidebar.classList.toggle("collapsed");
-    };
-
-    if (this.sidebarToggleBtn) {
-      this.sidebarToggleBtn.addEventListener("click", toggleSidebar);
-    }
-    if (this.sidebarCollapseBtn) {
-      this.sidebarCollapseBtn.addEventListener("click", toggleSidebar);
-    }
-
-    window.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        toggleSidebar();
-      }
     });
 
     // Hash-based tab navigation
