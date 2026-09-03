@@ -481,6 +481,266 @@ body {
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ==========================================================================
+   Track 01: AI Growth & Revenue Attribution Styles
+   ========================================================================== */
+.ai-growth-card {
+  background: linear-gradient(145deg, rgba(16, 23, 38, 0.9) 0%, rgba(13, 27, 42, 0.75) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-growth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #6366F1 0%, #10B981 50%, #8B5CF6 100%);
+}
+
+.ai-growth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.badge-track01 {
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  color: #FFF;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.ai-growth-title {
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: #FFF;
+  letter-spacing: -0.01em;
+}
+
+.ai-growth-kpi-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.15);
+}
+
+.ai-growth-kpi-pill .pill-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.ai-growth-kpi-pill .pill-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--success);
+  font-family: var(--font-sans);
+  letter-spacing: -0.02em;
+}
+
+.ai-growth-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.ai-growth-stat-card {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  transition: all 0.2s;
+}
+
+.ai-growth-stat-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.ai-growth-stat-card.highlight {
+  background: rgba(16, 185, 129, 0.04);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.ai-growth-stat-card.highlight:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.1);
+}
+
+.stat-card-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.stat-card-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #FFF;
+  letter-spacing: -0.02em;
+  font-family: var(--font-sans);
+}
+
+.stat-card-split {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.stat-card-split .split-arrow {
+  color: var(--primary);
+  font-size: 0.95rem;
+}
+
+.stat-card-sub {
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+/* Revenue Split Progress Bar */
+.growth-split-bar-wrapper {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+}
+
+.split-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.growth-split-bar {
+  display: flex;
+  height: 10px;
+  width: 100%;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.split-segment {
+  height: 100%;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.split-segment.baseline {
+  background: linear-gradient(90deg, #3B82F6, #6366F1);
+}
+
+.split-segment.ai-lift {
+  background: linear-gradient(90deg, #10B981, #059669);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
+}
+
+/* Top Performing AI Cross-Sell Bundles */
+.top-bundles-wrapper {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+}
+
+.bundles-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.bundles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.bundle-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: all 0.2s;
+}
+
+.bundle-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+
+.bundle-pair {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.bundle-base {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.bundle-plus {
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.bundle-addon {
+  color: #A78BFA;
+  font-weight: 500;
+}
+
+.bundle-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.2rem;
+}
+
 /* Tables */
 .table-responsive {
   width: 100%;
