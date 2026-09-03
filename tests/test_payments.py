@@ -588,4 +588,60 @@ def test_auto_debit_wallet_settlement():
     assert new_balance == round(initial_balance - 349.0, 2)
 
 
+def test_payment_link_paid_webhook_updates_ledger():
+    """
+    Verifies that when a user pays via a manual Razorpay Payment Link (payment_link.paid event),
+    the audit ledger record is updated to captured/PAID with the Razorpay order ID.
+    """
+    txn_id = "txn-plink-test-123"
+    audit_store.write_proposal(
+        transaction_id=txn_id,
+        customer_id="CUST001",
+        product_id="MN001",
+        merchant_id="MERCH_ELEC",
+        quantity=1,
+        amount=4999.0,
+        decision="REJECTED",
+        decision_reason="Exceeds mandate limit",
+        idempotency_key="idemp-plink-123",
+    )
+
+    secret = "dev-webhook-secret"
+    payload_dict = {
+        "event": "payment_link.paid",
+        "payload": {
+            "payment_link": {
+                "entity": {
+                    "id": "plink_TestPLink456",
+                    "reference_id": txn_id,
+                    "amount": 499900,
+                    "status": "paid",
+                    "notes": {"transaction_id": txn_id},
+                }
+            },
+            "payment": {
+                "entity": {
+                    "id": "pay_TestPayment789",
+                    "amount": 499900,
+                    "status": "captured",
+                }
+            }
+        }
+    }
+    body_bytes = json.dumps(payload_dict).encode("utf-8")
+    sig = hmac.new(secret.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+
+    resp = client.post(
+        "/payment/webhook",
+        content=body_bytes,
+        headers={"X-Razorpay-Signature": sig, "Content-Type": "application/json", "X-Razorpay-Event-Id": "evt_plink_paid_777"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["processed"] is True
+
+    record = audit_store.get(txn_id)
+    assert record.payment_status == "captured"
+    assert record.decision == "APPROVED"
+
+
 

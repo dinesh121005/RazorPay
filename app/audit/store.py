@@ -290,7 +290,10 @@ class AuditStore:
                 raise ValueError(f"Audit record '{transaction_id}' not found to update payment outcome")
 
             timestamp, customer_id, product_id, amount, decision, idempotency_key, prev_hash = row
-            final_decision = "APPROVED" if decision == "PENDING_CONFIRMATION" and payment_status == "created" else decision
+            final_decision = "APPROVED" if (
+                (decision in ("PENDING_CONFIRMATION", "REJECTED") and payment_status == "captured")
+                or (decision == "PENDING_CONFIRMATION" and payment_status == "created")
+            ) else decision
             
             event_type = "HUMAN_CONFIRMED" if decision == "PENDING_CONFIRMATION" and payment_status == "created" else (
                 "PAYMENT_FAILED" if payment_status == "failed" else (

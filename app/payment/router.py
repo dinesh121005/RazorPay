@@ -96,21 +96,31 @@ async def razorpay_webhook(
         )
 
     event = data.get("event", "")
+    payload_obj = data.get("payload", {})
+    
+    # Resolve entity across payment, payment_link, and order payload structures
     entity = (
-        data.get("payload", {})
-        .get("payment", {})
-        .get("entity", {})
+        payload_obj.get("payment", {}).get("entity", {})
+        or payload_obj.get("payment_link", {}).get("entity", {})
+        or payload_obj.get("order", {}).get("entity", {})
     )
-    if not entity:
-        entity = (
-            data.get("payload", {})
-            .get("order", {})
-            .get("entity", {})
-        )
 
     order_id = entity.get("order_id") or entity.get("id")
-    notes = entity.get("notes", {})
-    transaction_id = notes.get("transaction_id")
+    notes = entity.get("notes", {}) or {}
+    transaction_id = (
+        notes.get("transaction_id")
+        or notes.get("receipt")
+        or entity.get("reference_id")
+        or entity.get("receipt")
+    )
+
+    # Check payment_link sub-entity if not found on root entity
+    if not transaction_id and "payment_link" in payload_obj:
+        plink_entity = payload_obj.get("payment_link", {}).get("entity", {})
+        transaction_id = (
+            plink_entity.get("reference_id")
+            or plink_entity.get("notes", {}).get("transaction_id")
+        )
 
     # 3. Persistent Deduplication Check (Database Idempotency Guard)
     event_id = (
@@ -133,22 +143,22 @@ async def razorpay_webhook(
     # Persist in DB and memory
     audit_store.record_webhook_event(event_id)
     _processed_webhook_event_ids.add(event_id)
-    logger.info("Received and processing Razorpay webhook event: %s (id: %s) for order: %s", event, event_id, order_id)
+    logger.info("Received and processing Razorpay webhook event: %s (id: %s) for order: %s, tx: %s", event, event_id, order_id, transaction_id)
 
     # 4. State Transitions and Inventory Compensation
     if transaction_id:
         record = audit_store.get(transaction_id)
         if record:
-            if event in ("payment.captured", "order.paid"):
+            if event in ("payment.captured", "order.paid", "payment_link.paid"):
                 audit_store.update_payment_outcome(
                     transaction_id=transaction_id,
                     payment_status="captured",
                     razorpay_order_id=order_id,
                 )
-            elif event == "payment.failed":
+            elif event in ("payment.failed", "payment_link.cancelled", "payment_link.expired"):
                 # Automated inventory compensation: restore decremented stock
                 restore_stock(record.product_id, record.quantity)
-                logger.info("Restored %s units of %s after payment.failed event", record.quantity, record.product_id)
+                logger.info("Restored %s units of %s after %s event", record.quantity, record.product_id, event)
 
                 audit_store.update_payment_outcome(
                     transaction_id=transaction_id,
