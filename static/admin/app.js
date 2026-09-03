@@ -324,11 +324,13 @@ class AdminDashboard {
   renderOverviewMetrics() {
     const totalTx = this.auditRecords ? this.auditRecords.length : 0;
     const approvedTx = (this.auditRecords || []).filter((r) => r.decision === "APPROVED");
-    const totalVolume = approvedTx.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const settledRecords = (this.auditRecords || []).filter((r) => r.payment_status === "captured" || r.payment_status === "paid");
+    const pendingRecords = (this.auditRecords || []).filter((r) => r.payment_status === "created");
+    const totalSettledVolume = settledRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     const rate = totalTx > 0 ? Math.round((approvedTx.length / totalTx) * 100) : 0;
 
-    if (this.kpiTotalVolume) this.kpiTotalVolume.textContent = `₹${totalVolume.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-    if (this.kpiApprovedCount) this.kpiApprovedCount.textContent = `${approvedTx.length} approved orders`;
+    if (this.kpiTotalVolume) this.kpiTotalVolume.textContent = `₹${totalSettledVolume.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+    if (this.kpiApprovedCount) this.kpiApprovedCount.textContent = `${settledRecords.length} settled payments (${pendingRecords.length} pending)`;
     if (this.kpiTotalTx) this.kpiTotalTx.textContent = totalTx;
     if (this.kpiApprovalRate) this.kpiApprovalRate.textContent = `${rate}%`;
     if (this.kpiProgress) this.kpiProgress.style.width = `${rate}%`;
@@ -351,11 +353,13 @@ class AdminDashboard {
             r.decision === "APPROVED"
               ? `<span class="badge badge-success">APPROVED</span>`
               : `<span class="badge badge-danger">REJECTED</span>`;
-          const payBadge = r.payment_status === "created" || r.payment_status === "captured"
-            ? `<span class="badge badge-success">${escapeHtml(r.payment_status)}</span>`
+          const payBadge = r.payment_status === "captured" || r.payment_status === "paid"
+            ? `<span class="badge badge-success">✓ PAID</span>`
+            : r.payment_status === "created"
+            ? `<span class="badge badge-warning">⏳ PENDING</span>`
             : r.payment_status === "failed"
-            ? `<span class="badge badge-danger">failed</span>`
-            : `<span class="badge badge-neutral">${escapeHtml(r.payment_status || "none")}</span>`;
+            ? `<span class="badge badge-danger">FAILED</span>`
+            : `<span class="badge badge-neutral">—</span>`;
           const amountDisplay = (Number(r.amount) || 0).toFixed(2);
           const timeDisplay = r.timestamp ? escapeHtml(new Date(r.timestamp).toLocaleTimeString()) : "—";
           const safeCustId = escapeHtml(r.customer_id || "—");
@@ -399,7 +403,7 @@ class AdminDashboard {
     });
 
     if (filtered.length === 0) {
-      this.auditTbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-muted">No matching audit records found.</td></tr>`;
+      this.auditTbody.innerHTML = `<tr><td colspan="10" class="text-center py-6 text-muted">No matching audit records found.</td></tr>`;
       return;
     }
 
@@ -412,6 +416,13 @@ class AdminDashboard {
           r.decision === "APPROVED"
             ? `<span class="badge badge-success">APPROVED</span>`
             : `<span class="badge badge-danger">REJECTED</span>`;
+        const payBadge = r.payment_status === "captured" || r.payment_status === "paid"
+          ? `<span class="badge badge-success">✓ PAID</span>`
+          : r.payment_status === "created"
+          ? `<span class="badge badge-warning">⏳ PENDING</span>`
+          : r.payment_status === "failed"
+          ? `<span class="badge badge-danger">FAILED</span>`
+          : `<span class="badge badge-neutral">—</span>`;
         const rzpId = r.razorpay_order_id ? `<span class="mono text-xs">${escapeHtml(r.razorpay_order_id)}</span>` : `<span class="text-muted text-xs">—</span>`;
         const timeStr = r.timestamp ? escapeHtml(new Date(r.timestamp).toISOString().replace("T", " ").slice(0, 19)) : "—";
         const amountDisplay = (Number(r.amount) || 0).toFixed(2);
@@ -426,6 +437,7 @@ class AdminDashboard {
             <td>${escapeHtml(r.quantity || 1)}</td>
             <td class="mono font-semibold">₹${amountDisplay}</td>
             <td>${decBadge}</td>
+            <td>${payBadge}</td>
             <td>${rzpId}</td>
             <td>
               <button class="btn btn-secondary btn-sm" onclick="dashboard.showTxDetail('${escapeHtml(r.transaction_id)}')">View</button>
