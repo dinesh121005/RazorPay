@@ -99,8 +99,26 @@ def inquire_merchant_handler(
 ) -> Dict[str, Any]:
     """
     Handler allowing Buyer AI Agents (Claude) to consult the Merchant Sales Agent
-    with natural language queries and obtain smart product quotes and recommendations.
+    with natural language queries and obtain smart product quotes, recommendations,
+    and order status / payment confirmations.
     """
+    q_lower = query.lower()
+    if any(term in q_lower for term in ["status", "order", "paid", "payment", "placed", "receipt", "bought", "track"]):
+        cust_id = authenticated_customer_id.get() or "CUST001"
+        status_info = check_order_status_handler(customer_id=cust_id)
+        if status_info.get("order_found"):
+            req = InquiryRequest(
+                query=query,
+                max_budget=max_budget,
+                category=category,
+                quantity=quantity,
+            )
+            res = merchant_agent_service.process_inquiry(req)
+            data = res.model_dump()
+            data["order_status"] = status_info
+            data["merchant_notes"] = f"{status_info['message']} " + (data.get("merchant_notes") or "")
+            return data
+
     req = InquiryRequest(
         query=query,
         max_budget=max_budget,
