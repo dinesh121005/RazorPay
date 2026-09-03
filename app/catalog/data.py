@@ -142,12 +142,12 @@ PRODUCTS: List[Product] = [
     ),
     Product(
         id="HK002",
-        name="Stainless Steel Water Bottle (1L)",
+        name="Salem Stainless Steel Water Bottle (1L)",
         category="home_kitchen",
         merchant_id="MERCH_ELEC",
         price=899.0,
         stock=30,
-        description="Double-walled vacuum insulated water bottle keeping liquids cold for 24 hours."
+        description="Double-walled vacuum insulated food-grade Salem stainless steel water bottle keeping liquids cold for 24 hours."
     ),
     Product(
         id="HK003",
@@ -178,12 +178,12 @@ PRODUCTS: List[Product] = [
     ),
     Product(
         id="HK006",
-        name="Pre-Seasoned Cast Iron Skillet (10-inch)",
+        name="Pre-Seasoned Cast Iron Dosa Tawa & Skillet (10-inch)",
         category="home_kitchen",
         merchant_id="MERCH_ELEC",
         price=1499.0,
         stock=20,
-        description="Heavy-duty pre-seasoned cast iron skillet pan offering superior heat retention for stovetop and oven."
+        description="Heavy-duty pre-seasoned cast iron tawa and skillet pan hand-poured by rural Tamil artisans, perfect for crispy dosas and stovetop searing."
     ),
     Product(
         id="HK007",
@@ -192,7 +192,7 @@ PRODUCTS: List[Product] = [
         merchant_id="MERCH_ELEC",
         price=599.0,
         stock=45,
-        description="Battery-operated stainless steel whisk frother for lattes, cappuccinos, and matcha."
+        description="Battery-operated stainless steel whisk frother for traditional frothy filter coffee and matcha."
     ),
     Product(
         id="HK008",
@@ -223,7 +223,7 @@ PRODUCTS: List[Product] = [
     ),
 
     # ══════════════════════════════════════════════════════════════════════════════
-    # 3. Foods, Pantry & Healthy Snacks (24 Products)
+    # 3. Foods, Pantry & Tamil Nadu Regional Delicacies (25 Products)
     # ══════════════════════════════════════════════════════════════════════════════
     Product(
         id="FD001",
@@ -232,223 +232,223 @@ PRODUCTS: List[Product] = [
         merchant_id="MERCH_FOOD",
         price=349.0,
         stock=60,
-        description="Unrefined cold-pressed virgin coconut oil, suitable for cooking and skincare."
+        description="Authentic Pollachi cold-pressed virgin coconut oil (Mara Chekku Thengai Ennai), extracted from handpicked coconuts, unrefined and nutrient-rich for cooking and wellness."
     ),
     Product(
         id="FD002",
-        name="Organic Rolled Oats (1kg)",
+        name="Organic Rolled Oats & Samai Millet (1kg)",
         category="food",
         merchant_id="MERCH_FOOD",
         price=299.0,
         stock=80,
-        description="Whole grain certified organic rolled oats, gluten-free, high in dietary fibre."
+        description="Wholesome breakfast blend of certified organic rolled oats and Little Millet (Samai) sourced from Tamil Nadu organic farms, rich in dietary fibre."
     ),
     Product(
         id="FD003",
-        name="Roasted California Almonds (250g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=399.0,
-        stock=50,
-        description="Premium dry-roasted crunchy almonds lightly dusted with pure sea salt."
-    ),
-    Product(
-        id="FD004",
-        name="Salted Jumbo Whole Cashews (250g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=449.0,
-        stock=45,
-        description="Slow-roasted jumbo whole cashews with a rich buttery crunch and light salt."
-    ),
-    Product(
-        id="FD005",
-        name="Peri-Peri Roasted Foxnuts Makhana (100g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=179.0,
-        stock=70,
-        description="Crunchy popped lotus seeds tossed in zesty peri-peri spice blend, low calorie and gluten-free."
-    ),
-    Product(
-        id="FD006",
-        name="Dark Chocolate Almond Granola Bites (200g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=249.0,
-        stock=60,
-        description="Baked clusters of rolled oats, roasted almonds, and 70% dark Belgian chocolate chunks."
-    ),
-    Product(
-        id="FD007",
-        name="Artisan Coorg Filter Coffee Powder (500g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=420.0,
-        stock=40,
-        description="Traditional 80:20 Arabica and Robusta coffee chicory blend roasted in the hills of Coorg."
-    ),
-    Product(
-        id="FD008",
-        name="Raw Kashmiri Organic Acacia Honey (500g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=499.0,
-        stock=35,
-        description="100% pure unprocessed wild acacia honey harvested from Kashmir valleys, unpasteurized."
-    ),
-    Product(
-        id="FD009",
-        name="Pure Himalayan Pink Rock Salt (1kg)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=149.0,
-        stock=90,
-        description="Unrefined mineral-rich coarse pink salt naturally mined from ancient Himalayan rock beds."
-    ),
-    Product(
-        id="FD010",
-        name="Multigrain Protein Energy Bars (Pack of 6)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=299.0,
-        stock=55,
-        description="Nutrient-dense snack bars packed with whey protein, seeds, dates, and zero added refined sugar."
-    ),
-    Product(
-        id="FD011",
-        name="Baked Ragi & Jowar Crisp Crackers (150g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=129.0,
-        stock=65,
-        description="Ancient millet savory snack crackers seasoned with cumin and black pepper."
-    ),
-    Product(
-        id="FD012",
-        name="Organic Raw White Chia Seeds (250g)",
+        name="Kovilpatti Special Kadalai Mittai (400g)",
         category="food",
         merchant_id="MERCH_FOOD",
         price=199.0,
         stock=50,
-        description="Certified organic raw chia seeds rich in Omega-3 fatty acids, plant protein, and soluble fibre."
+        description="GI-tagged authentic Kovilpatti peanut brittle made with slow-roasted groundnuts, pure organic sugarcane jaggery syrup, and crushed cardamom."
     ),
     Product(
-        id="FD013",
-        name="Roasted Peanuts with Pink Salt (400g)",
+        id="FD004",
+        name="Panruti Roasted Jumbo Cashews (250g)",
         category="food",
         merchant_id="MERCH_FOOD",
-        price=169.0,
-        stock=75,
-        description="Crispy hot-air roasted peanuts seasoned with Himalayan pink rock salt."
-    ),
-    Product(
-        id="FD014",
-        name="Royal Masala Chai Spiced Tea Blend (250g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=299.0,
-        stock=40,
-        description="Assam black CTC tea infused with crushed cardamom, cinnamon, clove, ginger, and star anise."
-    ),
-    Product(
-        id="FD015",
-        name="Tangy Tomato Quinoa Crisps (100g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=139.0,
-        stock=60,
-        description="Popped quinoa chips seasoned with sun-ripened tangy tomato powder and Mediterranean herbs."
-    ),
-    Product(
-        id="FD016",
-        name="All-Natural Creamy Peanut Butter (500g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=349.0,
-        stock=50,
-        description="100% pure roasted peanuts slow-ground into a silky spread with zero palm oil or preservatives."
-    ),
-    Product(
-        id="FD017",
-        name="Alphonso Mango Preserve Fruit Spread (340g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=259.0,
-        stock=30,
-        description="Gourmet handcrafted preserve made with 70% real Ratnagiri Alphonso mango pulp."
-    ),
-    Product(
-        id="FD018",
-        name="Whole Leaf Darjeeling Green Tea (100g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=280.0,
+        price=449.0,
         stock=45,
-        description="Single-estate whole leaf first flush green tea rich in natural antioxidants."
+        description="Premium grade whole cashews harvested from Panruti, slow-roasted to golden perfection with a touch of crystal sea salt."
     ),
     Product(
-        id="FD019",
-        name="Superfruit Dried Berry Medley (200g)",
+        id="FD005",
+        name="Authentic Tirunelveli Ghee Wheat Halwa (250g)",
         category="food",
         merchant_id="MERCH_FOOD",
-        price=389.0,
-        stock=35,
-        description="Antioxidant-rich blend of whole dried cranberries, wild blueberries, goji berries, and black raisins."
+        price=220.0,
+        stock=70,
+        description="Legendary melting wheat halwa slow-cooked with Thamirabarani river water, fermented whole wheat milk, raw sugar, and pure desi cow ghee."
     ),
     Product(
-        id="FD020",
-        name="Baked Beetroot & Sweet Potato Chips (100g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=149.0,
-        stock=55,
-        description="Vibrant root vegetable crisps vacuum-cooked in cold-pressed oil with a pinch of sea salt."
-    ),
-    Product(
-        id="FD021",
-        name="Raw Pumpkin & Sunflower Seed Blend (200g)",
-        category="food",
-        merchant_id="MERCH_FOOD",
-        price=219.0,
-        stock=45,
-        description="Nutrient-dense unroasted seed mix offering zinc, magnesium, and healthy dietary fats."
-    ),
-    Product(
-        id="FD022",
-        name="Single-Origin 70% Dark Chocolate Bar (80g)",
+        id="FD006",
+        name="Ooty Homemade Roasted Almond Dark Chocolates (200g)",
         category="food",
         merchant_id="MERCH_FOOD",
         price=249.0,
         stock=60,
-        description="Bean-to-bar artisanal dark chocolate crafted with South Indian cacao beans and organic raw cane sugar."
+        description="Artisanal hill-station dark chocolate handcrafted in Ooty with rich roasted Nilgiri almonds and 70% pure cocoa."
+    ),
+    Product(
+        id="FD007",
+        name="Kumbakonam Degree Filter Coffee Blend (500g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=420.0,
+        stock=40,
+        description="Traditional 80:20 Kaveri delta Arabica and Peaberry coffee chicory blend roasted for brewing authentic frothy South Indian degree filter coffee."
+    ),
+    Product(
+        id="FD008",
+        name="Marthandam Wild Forest Organic Honey (500g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=499.0,
+        stock=35,
+        description="100% pure raw unprocessed wild honey ethically harvested by tribal apiculturists in the Marthandam Western Ghats forests of Kanyakumari."
+    ),
+    Product(
+        id="FD009",
+        name="Tuticorin Sun-Dried Natural Crystal Sea Salt (1kg)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=99.0,
+        stock=90,
+        description="Natural unrefined mineral-rich crystal sea salt solar-evaporated and harvested from the coastal salt pans of Thoothukudi (Tuticorin)."
+    ),
+    Product(
+        id="FD010",
+        name="Traditional Sathu Maavu Millet Health Mix (500g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=299.0,
+        stock=55,
+        description="Time-honored Tamil Nadu porridge mix prepared with 14 sprouted millets, pulses, almonds, cashews, cardamom, and dry ginger (Sukku)."
+    ),
+    Product(
+        id="FD011",
+        name="Manapparai Crispy Garlic Butter Murukku (250g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=149.0,
+        stock=65,
+        description="GI-tagged iconic spiral murukku from Manapparai, double-fried for signature crispness and seasoned with roasted cumin, butter, and asafoetida."
+    ),
+    Product(
+        id="FD012",
+        name="Chettinad Heritage Karuppu Kavuni Black Rice (1kg)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=240.0,
+        stock=50,
+        description="Nutrient-dense heritage black rice from Chettinad, prized since ancient Pandya times for its anthocyanin antioxidants, high iron, and nutty aroma."
+    ),
+    Product(
+        id="FD013",
+        name="Madurai Masala Roasted Spicy Groundnuts (400g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=169.0,
+        stock=75,
+        description="Crunchy street-style roasted peanuts tossed with fragrant curry leaves, roasted garlic, and fiery Madurai red chilli powder."
+    ),
+    Product(
+        id="FD014",
+        name="Nilgiri Orthodox Whole Leaf Golden Black Tea (250g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=299.0,
+        stock=40,
+        description="Single-estate high-grown orthodox whole leaf black tea from the misty Blue Mountains of Nilgiris, with bright floral liquor and brisk finish."
+    ),
+    Product(
+        id="FD015",
+        name="Srivilliputhur Traditional Ghee Palkova (250g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=210.0,
+        stock=60,
+        description="GI-certified heritage milk sweet slow-simmered in heavy-bottomed brass pans with full-cream country milk and organic cane sugar in Srivilliputhur."
+    ),
+    Product(
+        id="FD016",
+        name="Erode Wood-Pressed Gingelly Sesame Oil (500ml)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=280.0,
+        stock=50,
+        description="Traditional Mara Chekku gingelly oil extracted from premium Erode black sesame seeds and palm jaggery, quintessential for authentic Tamil cooking."
+    ),
+    Product(
+        id="FD017",
+        name="Salem Malgova Mango Thokku Pickle (350g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=189.0,
+        stock=30,
+        description="Handcrafted spicy and tangy grated green mango thokku made with famed Salem mangoes, cold-pressed sesame oil, fenugreek, and mustard."
+    ),
+    Product(
+        id="FD018",
+        name="Ooty Nilgiri Whole Leaf Green Tea (100g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=250.0,
+        stock=45,
+        description="Delicate single-estate green tea harvested at 6,000 feet in Ooty, minimally oxidized to preserve rich catechins and smooth grassy notes."
+    ),
+    Product(
+        id="FD019",
+        name="Kodaikanal Dried Hill Plums & Figs (200g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=349.0,
+        stock=35,
+        description="Sun-dried tart hill plums and succulent sweet figs grown in Kodaikanal orchards, lightly glazed with wild forest honey."
+    ),
+    Product(
+        id="FD020",
+        name="Nagercoil Crispy Nendran Banana Chips (200g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=160.0,
+        stock=55,
+        description="Wafer-thin raw Nendran plantain slices kettle-fried in pure cold-pressed coconut oil with natural turmeric and sea salt in Nagercoil style."
+    ),
+    Product(
+        id="FD021",
+        name="Madurai Traditional Spicy Idli Milagai Podi (250g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=149.0,
+        stock=45,
+        description="Authentic South Indian Gunpowder chutney podi hand-pounded with roasted urad dal, chana dal, red chillies, white sesame seeds, and asafoetida."
+    ),
+    Product(
+        id="FD022",
+        name="Anamalai Single-Origin 70% Craft Dark Chocolate (80g)",
+        category="food",
+        merchant_id="MERCH_FOOD",
+        price=249.0,
+        stock=60,
+        description="Tree-to-bar artisanal dark chocolate made from sustainable cocoa beans cultivated in the agro-forestry estates of the Anamalai Hills, Pollachi."
     ),
     Product(
         id="FD023",
-        name="Organic Moringa Herbal Infusion (50 Bags)",
+        name="Madurai Organic Moringa Leaf Herbal Infusion (50 Bags)",
         category="food",
         merchant_id="MERCH_FOOD",
-        price=320.0,
+        price=260.0,
         stock=30,
-        description="Caffeine-free herbal wellness tea bags made from shade-dried organic moringa oleifera leaves."
+        description="Caffeine-free herbal wellness infusion bags made from shade-dried organic Murungai Keerai (moringa leaves) from farms around Madurai."
     ),
     Product(
         id="FD024",
-        name="Herbed Garlic Baked Pita Chips (150g)",
+        name="Karaikudi Chettinad Spicy Mixture & Seeval (200g)",
         category="food",
         merchant_id="MERCH_FOOD",
         price=159.0,
         stock=50,
-        description="Double-baked whole wheat pita chips seasoned with roasted garlic, oregano, and olive oil."
+        description="Authentic Chettinad savory crunch mix made with gram flour sev, boondi, fried peanuts, roasted garlic flakes, and crisp curry leaves."
     ),
     Product(
         id="FD025",
-        name="Organic Jaggery Peanut Chikki (300g)",
+        name="Thoothukudi Authentic Cashew Macaroons (250g)",
         category="food",
         merchant_id="MERCH_FOOD",
-        price=189.0,
+        price=279.0,
         stock=65,
-        description="Traditional crunchy Indian brittle made with roasted peanuts and unrefined organic jaggery."
+        description="Legendary coastal Tamil Nadu cone-shaped macaroons baked with slow-whipped egg whites, sugar, and finely crushed roasted cashews."
     ),
 
     # ══════════════════════════════════════════════════════════════════════════════
@@ -456,11 +456,11 @@ PRODUCTS: List[Product] = [
     # ══════════════════════════════════════════════════════════════════════════════
     Product(
         id="AP001",
-        name="Organic Cotton Crew T-Shirt",
+        name="Tiruppur Organic Cotton Crew T-Shirt",
         category="apparel",
         merchant_id="MERCH_ELEC",
         price=799.0,
         stock=40,
-        description="Breathable 100% organic cotton crew neck t-shirt in midnight blue."
+        description="Breathable 100% organic combed cotton crew neck t-shirt crafted in Tiruppur, the textile knitwear capital of Tamil Nadu."
     ),
 ]

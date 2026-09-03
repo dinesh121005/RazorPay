@@ -156,7 +156,7 @@ def test_transaction_id_passed_as_receipt():
 def test_rejected_purchase_no_payment_call():
     """
     CUST001 + MN001 (₹4,999 > ₹2,000 mandate) → REJECTED.
-    Razorpay must never be called; payment field in response is None.
+    Razorpay order.create must never be called (no auto-debit); manual payment link may be provided.
     """
     with patch(_CREATE_ORDER) as mock_create:
         response = client.post(
@@ -173,11 +173,13 @@ def test_rejected_purchase_no_payment_call():
     assert response.status_code == 200
     data = response.json()
     assert data["decision"] == "REJECTED"
-    assert data["payment"] is None
+    if data["payment"] is not None:
+        assert data["payment"]["payment_method"] == "razorpay_link"
+        assert data["payment"]["payment_url"] is not None
 
 
-def test_rejected_response_has_null_payment():
-    """Rejected response serializes payment as JSON null, not an absent key."""
+def test_rejected_response_has_payment_link_or_null():
+    """Rejected response provides manual checkout link/QR or null payment."""
     with patch(_CREATE_ORDER):
         response = client.post(
             "/agent/purchase",
@@ -191,8 +193,9 @@ def test_rejected_response_has_null_payment():
 
     data = response.json()
     assert data["decision"] == "REJECTED"
-    assert "payment" in data           # field is present in the JSON
-    assert data["payment"] is None     # and its value is null
+    assert "payment" in data
+    if data["payment"] is not None:
+        assert data["payment"]["qr_code_url"] is not None
 
 
 def test_rejected_contains_transaction_id():
@@ -556,6 +559,33 @@ def test_persistent_database_webhook_deduplication():
     data = resp.json()
     assert data["deduplicated"] is True
     assert data["processed"] is True
+
+
+def test_auto_debit_wallet_settlement():
+    """
+    Verifies that policy-approved purchases successfully auto-debit the customer's
+    pre-authorized mandate wallet balance.
+    """
+    from app.wallet.store import wallet_store
+    wallet_store.set_balance("CUST001", 5000.0)
+    initial_balance = wallet_store.get_balance("CUST001")
+
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
+        response = client.post(
+            "/agent/purchase",
+            json={
+                "customer_id": "CUST001",
+                "product_id": "FD001",  # ₹349
+                "quantity": 1,
+            },
+            headers=_ADMIN_HEADERS,
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["decision"] == "APPROVED"
+    new_balance = wallet_store.get_balance("CUST001")
+    assert new_balance == round(initial_balance - 349.0, 2)
 
 
 

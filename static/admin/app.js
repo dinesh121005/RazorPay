@@ -805,16 +805,44 @@ class AdminDashboard {
   renderPurchaseCompletion(purData, productId, inqData, humanConfirmed = false) {
     const isApproved = purData.decision === "APPROVED";
     this.sandboxStatusPill.className = isApproved ? "badge badge-success" : "badge badge-danger";
-    this.sandboxStatusPill.textContent = isApproved ? "Purchase Approved" : "Policy Rejected";
+    this.sandboxStatusPill.textContent = isApproved ? "Purchase Approved (Auto-Debited)" : "Policy Rejected (Manual Pay Available)";
 
     const refCode = isApproved ? `REF-${purData.transaction_id.slice(-8).toUpperCase()}` : "N/A";
     const rzpOrderId = purData.payment && purData.payment.razorpay_order_id
       ? `<span class="mono font-bold text-success">${escapeHtml(purData.payment.razorpay_order_id)}</span>`
-      : "None (Policy Rejected)";
+      : "None";
 
     const humanTag = humanConfirmed
       ? `<div class="badge badge-success mb-2">✓ Verified via Human Confirmation Challenge</div>`
       : "";
+
+    const autoDebitBanner = isApproved
+      ? `<div class="badge badge-success mt-2" style="padding: 6px 12px; font-size: 13px;">⚡ Auto-Debited from Pre-Authorized Mandate Balance (Status: PAID)</div>`
+      : "";
+
+    let manualPaymentBlock = "";
+    if (!isApproved && purData.payment && purData.payment.qr_code_url) {
+      manualPaymentBlock = `
+        <div class="mt-3 p-3" style="background: rgba(59, 130, 246, 0.08); border: 1px solid #3b82f6; border-radius: 8px;">
+          <div style="font-weight: 700; color: #3b82f6; font-size: 13px; margin-bottom: 8px;">
+            📱 Pay with Your Own App (UPI QR / Razorpay Link)
+          </div>
+          <p class="text-xs text-muted mb-2">
+            The AI Buyer has escalated this out-of-mandate item to the customer. Scan with PhonePe / Google Pay or click below to pay:
+          </p>
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <img src="${escapeHtml(purData.payment.qr_code_url)}" alt="UPI QR" style="width: 130px; height: 130px; border-radius: 6px; border: 2px solid #3b82f6; background: white; padding: 4px;" />
+            <div>
+              <div class="text-xs mb-1"><strong>Item:</strong> ${escapeHtml(productId)}</div>
+              <div class="text-xs mb-2"><strong>Amount:</strong> <span class="mono font-bold">₹${(Number(purData.amount) || 0).toFixed(2)}</span></div>
+              <a href="${escapeHtml(purData.payment.payment_url || '#')}" target="_blank" class="btn btn-primary btn-sm" style="background: #3b82f6; text-decoration: none; display: inline-block;">
+                🔗 Open Razorpay Payment Link
+              </a>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     this.sandboxConsole.innerHTML = `
       <div class="trace-step info">
@@ -830,13 +858,14 @@ class AdminDashboard {
         <div class="mt-2 text-xs">Total Amount: <span class="mono font-bold">₹${(Number(purData.amount) || 0).toFixed(2)}</span></div>
         <div class="text-xs">Razorpay Order ID: ${rzpOrderId}</div>
         <div class="text-xs">Human Reference Code: <span class="mono font-bold">${escapeHtml(refCode)}</span></div>
+        ${autoDebitBanner}
+        ${manualPaymentBlock}
       </div>
     `;
 
     this.fetchAllData();
-    this.showToast(`Sandbox run completed: ${purData.decision}`, isApproved ? "success" : "error");
+    this.showToast(`Sandbox run completed: ${purData.decision}`, isApproved ? "success" : "info");
   }
-
 
   showToast(message, type = "info") {
     const container = document.getElementById("toast-container");

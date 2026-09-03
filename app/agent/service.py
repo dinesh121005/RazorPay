@@ -2,7 +2,8 @@
 Agent commerce service layer.
 
 Provides transport-agnostic purchase proposal orchestration, confirmation gating,
-deterministic policy mandate evaluation, inventory management, and payment execution.
+deterministic policy mandate evaluation, inventory management, auto-debit wallet settlement,
+and Razorpay payment links / UPI QR code generation.
 """
 import hashlib
 from datetime import datetime, timedelta, timezone
@@ -24,9 +25,11 @@ from app.exceptions import (
 )
 from app.oauth.crypto import JWT_SECRET
 from app.payment import PaymentResult, create_order_for_approved
+from app.payment.service import create_payment_link_for_manual
 from app.policy.engine import evaluate
 from app.policy.requests import PurchaseRequest
 from app.policy.store import mandate_store
+from app.wallet.store import wallet_store
 
 # Autonomous execution threshold: orders under ₹500 can auto-execute within mandate.
 # Orders >= ₹500 require human confirmation token for safety and gating.
@@ -101,9 +104,13 @@ def _build_replayed_response(record: AuditRecord) -> "PurchaseResponse":
     limit = mandate.max_transaction_amount if mandate else record.amount
     payment = None
     if record.payment_status is not None:
+        short_url = f"https://rzp.io/i/{record.razorpay_order_id or record.transaction_id[:12]}"
         payment = PaymentResult(
             status=record.payment_status,
             razorpay_order_id=record.razorpay_order_id,
+            payment_url=short_url,
+            qr_code_url=f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={short_url}",
+            payment_method="auto_debit" if record.payment_status == "captured" else "razorpay_order",
         )
     return PurchaseResponse(
         decision=record.decision,
@@ -149,7 +156,7 @@ class PurchaseResponse(BaseModel):
     transaction_id: str = Field(..., description="Gateway-minted UUID for this proposal, used as Razorpay receipt")
     payment: Optional[PaymentResult] = Field(
         default=None,
-        description="Razorpay order result when decision is APPROVED; None when REJECTED, pending, or failed."
+        description="Razorpay order or payment link result when decision is evaluated."
     )
     idempotency_key: Optional[str] = Field(
         default=None,
@@ -184,12 +191,13 @@ def execute_purchase(
     9. Evaluate proposal against customer mandate (deterministic, no side effects).
     10. Mint a unique transaction_id for cross-system tracing.
     11. Phase A Audit: Record proposal, verdict, and reasoning in SQLite audit store.
-    12. Check Safety Confirmation Gate:
+    12. Check Safety Confirmation Gate & Policy Execution:
         - If APPROVED and amount >= ₹500:
           Return PENDING_CONFIRMATION with confirmation_token (no payment yet).
         - If APPROVED and amount < ₹500:
-          Execute Razorpay Test Mode order, decrement inventory, update Phase B audit, return APPROVED.
-        - If REJECTED: skip Razorpay entirely.
+          Execute Razorpay order & auto-debit customer pre-authorized balance, decrement inventory, update Phase B audit, return APPROVED.
+        - If REJECTED (Out of Mandate / Exceeds Limit):
+          Generate Razorpay Payment Link and dynamic UPI QR Code so user can pay via their own app.
     """
     # 1. Transport-agnostic input validation
     if not isinstance(quantity, int) or quantity < 1:
@@ -258,7 +266,7 @@ def execute_purchase(
     )
 
     confirmation_token = None
-    if requires_confirmation:
+    if requires_confirmation or decision.status == "REJECTED":
         confirmation_token = generate_confirmation_token(
             customer_id=customer_id,
             product_id=product.id,
@@ -288,11 +296,14 @@ def execute_purchase(
             return _build_replayed_response(existing_record)
         raise
 
-    # 13. Immediate payment execution ONLY for micro-purchases or pre-confirmed requests
+    # 13. Payment execution:
+    # - If APPROVED (< ₹500): Order creation + Auto-debit
+    # - If REJECTED (Out of Mandate): Generate Payment Link & UPI QR for manual user checkout
     payment_result = None
     final_decision = initial_decision_status
 
     if decision.status == "APPROVED" and not requires_confirmation:
+        # 1. Create Razorpay Test Order
         payment_result = create_order_for_approved(
             amount_inr=amount,
             receipt=transaction_id,
@@ -303,6 +314,8 @@ def execute_purchase(
             final_decision = "PAYMENT_FAILED"
             decision_reason = f"Policy approved purchase of {product.name} (₹{amount:.2f}), but Razorpay payment rail failed: {payment_result.error}"
         else:
+            # 2. Auto-debit customer pre-authorized balance
+            wallet_store.debit(customer_id, amount)
             # Decrement inventory stock on successful order creation
             decrement_stock(product.id, quantity)
 
@@ -311,6 +324,15 @@ def execute_purchase(
             transaction_id=transaction_id,
             payment_status=payment_result.status,
             razorpay_order_id=payment_result.razorpay_order_id,
+        )
+    elif decision.status == "REJECTED":
+        # Out-of-mandate graceful escalation: generate Payment Link & UPI QR so customer can pay via their own app
+        payment_result = create_payment_link_for_manual(
+            amount_inr=amount,
+            receipt=transaction_id,
+            customer_id=customer_id,
+            product_id=product.id,
+            product_name=product.name,
         )
 
     return PurchaseResponse(
@@ -338,7 +360,7 @@ def confirm_purchase(
     3. Idempotency & Replay Guard: Checks if transaction_id has already been confirmed/finalized.
     4. Re-verifies catalog inventory stock availability.
     5. Re-evaluates deterministic policy engine mandate rules at confirmation time.
-    6. Creates Razorpay Test Mode order.
+    6. Creates Razorpay Test Mode order and settles via auto-debit.
     7. Decrements inventory stock.
     8. Updates audit record from PENDING_CONFIRMATION to APPROVED and logs payment outcome.
     9. Returns shaped PurchaseResponse with confirmed reference code.
@@ -413,6 +435,8 @@ def confirm_purchase(
     else:
         final_decision = "APPROVED"
         reason = f"Human confirmation verified. Transaction approved and Razorpay order minted for ₹{amount:.2f}."
+        # Auto-debit customer pre-authorized balance
+        wallet_store.debit(token_customer_id, amount)
         # Decrement real stock
         decrement_stock(product.id, quantity)
 
@@ -435,4 +459,3 @@ def confirm_purchase(
         requires_confirmation=False,
         confirmation_token=None,
     )
-

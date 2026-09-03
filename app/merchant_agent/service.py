@@ -27,25 +27,36 @@ SEMANTIC_FEATURE_MAP = {
     "monitor": ["display", "screen", "ips", "144hz", "hdr10"],
     "screen": ["display", "ips", "monitor", "4k"],
     "drink": ["mug", "bottle", "water", "coffee", "ceramic"],
-    "coffee": ["ceramic", "heat-resistant", "mug"],
-    "tea": ["ceramic", "heat-resistant", "mug"],
-    "water": ["stainless steel", "insulated", "vacuum"],
-    "bottle": ["insulated", "vacuum", "water bottle"],
-    "healthy": ["organic", "unrefined", "whole grain", "dietary fibre"],
-    "breakfast": ["oats", "rolled oats", "whole grain"],
-    "oil": ["coconut oil", "cold-pressed", "virgin"],
-    "clothes": ["cotton", "t-shirt", "crew neck", "apparel"],
-    "apparel": ["cotton", "t-shirt", "crew neck"],
+    "coffee": ["filter coffee", "kumbakonam", "degree", "peaberry", "ceramic", "heat-resistant", "mug"],
+    "tea": ["nilgiri", "green tea", "black tea", "moringa", "infusion", "ceramic", "heat-resistant", "mug"],
+    "water": ["stainless steel", "salem", "insulated", "vacuum"],
+    "bottle": ["insulated", "vacuum", "water bottle", "salem"],
+    "healthy": ["organic", "unrefined", "whole grain", "dietary fibre", "millet", "sathu maavu", "moringa"],
+    "breakfast": ["oats", "rolled oats", "samai", "millet", "whole grain", "sathu maavu"],
+    "oil": ["coconut oil", "cold-pressed", "virgin", "gingelly", "sesame", "mara chekku", "nalla ennai"],
+    "snack": ["murukku", "kadalai mittai", "halwa", "palkova", "banana chips", "macaroons", "mixture", "seeval"],
+    "sweets": ["halwa", "palkova", "kadalai mittai", "chocolates", "jaggery", "tirunelveli"],
+    "sweet": ["halwa", "palkova", "kadalai mittai", "chocolates", "jaggery", "tirunelveli"],
+    "spice": ["idli milagai podi", "podi", "gunpowder", "mango thokku", "pickle", "curry leaves", "chilli"],
+    "rice": ["black rice", "karuppu kavuni", "heritage", "antioxidants"],
+    "clothes": ["cotton", "t-shirt", "crew neck", "apparel", "tiruppur"],
+    "apparel": ["cotton", "t-shirt", "crew neck", "tiruppur"],
 }
 
 # Cross-sell affinity graph mapping product IDs to complementary add-on product IDs
 CROSS_SELL_AFFINITY_MAP: Dict[str, List[str]] = {
     "KB001": ["HK001", "HK002"],  # Mechanical Keyboard -> Ceramic Coffee Mug (for desk), Water Bottle
     "MN001": ["KB001", "HK001"],  # Monitor -> Mechanical Keyboard, Coffee Mug
-    "HK001": ["HK002", "AP001"],  # Coffee Mug -> Water Bottle, T-Shirt
+    "HK001": ["FD007", "HK002", "AP001"],  # Coffee Mug -> Kumbakonam Filter Coffee, Water Bottle, T-Shirt
     "HK002": ["HK001", "AP001"],  # Water Bottle -> Coffee Mug, T-Shirt
-    "FD001": ["FD002"],           # Coconut Oil -> Rolled Oats
-    "FD002": ["FD001"],           # Rolled Oats -> Coconut Oil
+    "HK005": ["FD007", "HK001"],  # French Press / Coffee Maker -> Kumbakonam Filter Coffee, Mug
+    "HK006": ["FD016", "FD021"],  # Dosa Tawa -> Erode Sesame Oil, Madurai Idli Milagai Podi
+    "FD001": ["FD002", "FD020"],  # Coconut Oil -> Rolled Oats & Millets, Banana Chips
+    "FD002": ["FD001", "FD008"],  # Rolled Oats -> Coconut Oil, Marthandam Honey
+    "FD007": ["HK001", "FD003", "FD011"],  # Kumbakonam Filter Coffee -> Coffee Mug, Kadalai Mittai, Murukku
+    "FD011": ["FD005", "FD007"],  # Manapparai Murukku -> Tirunelveli Halwa, Filter Coffee
+    "FD016": ["FD021", "FD012"],  # Sesame Oil -> Idli Milagai Podi, Karuppu Kavuni Rice
+    "FD021": ["FD016", "HK006"],  # Idli Milagai Podi -> Gingelly Sesame Oil, Dosa Tawa
     "AP001": ["HK002", "HK001"],  # Apparel -> Water Bottle, Mug
 }
 

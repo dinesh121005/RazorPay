@@ -10,13 +10,19 @@ The real client is created on the first call to get_client().
 """
 import logging
 import os
-import razorpay
+import time
+from typing import Any
+
+try:
+    import razorpay  # type: ignore[import-not-found,import-untyped]
+except ImportError:
+    razorpay = None
 
 _logger = logging.getLogger("gateway.payment.client")
 _client = None
 
 
-def get_client() -> razorpay.Client:
+def get_client() -> Any:
     """
     Return the module-level Razorpay client singleton, creating it on first call.
     Reads RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET from environment variables.
@@ -58,6 +64,26 @@ def create_order(amount_paise: int, receipt: str, notes: dict) -> dict:
     })
 
 
+def create_payment_link(amount_paise: int, receipt: str, description: str, notes: dict) -> dict:
+    """
+    Create a Razorpay Payment Link in Test Mode for customer manual self-checkout (UPI/Cards).
+
+    Returns:
+        The raw payment link dict from Razorpay containing 'id', 'short_url', 'status', etc.
+    """
+    client = get_client()
+    expire_by = int(time.time()) + 1800  # 30-minute validity
+    return client.payment_link.create(data={
+        "amount": amount_paise,
+        "currency": "INR",
+        "accept_partial": False,
+        "description": description,
+        "reference_id": receipt,
+        "expire_by": expire_by,
+        "notes": notes,
+    })
+
+
 def verify_webhook_signature(body_bytes: bytes, signature: str, webhook_secret: str) -> bool:
     """
     Verifies Razorpay webhook payload signature using HMAC-SHA256.
@@ -88,4 +114,3 @@ def verify_payment_signature(razorpay_order_id: str, razorpay_payment_id: str, r
         return True
     except Exception:
         return False
-

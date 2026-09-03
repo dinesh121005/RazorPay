@@ -14,15 +14,15 @@ from contextvars import ContextVar
 import logging
 from typing import Any, Dict, List, Optional
 try:
-    from mcp.server.mcpserver import MCPServer
+    from mcp.server.mcpserver import MCPServer  # type: ignore[import-not-found,import-untyped]
 except ImportError:
     try:
-        from mcp.server.fastmcp import FastMCP as MCPServer
+        from mcp.server.fastmcp import FastMCP as MCPServer  # type: ignore[import-not-found,import-untyped]
     except ImportError:
         try:
-            from mcp.server import MCPServer
+            from mcp.server import MCPServer  # type: ignore[import-not-found,import-untyped]
         except ImportError:
-            from mcp.server import FastMCP as MCPServer
+            from mcp.server import FastMCP as MCPServer  # type: ignore[import-not-found,import-untyped]
 
 from app.agent.service import (
     PurchaseResponse,
@@ -55,7 +55,7 @@ def to_customer_response(full_response: PurchaseResponse) -> Dict[str, Any]:
     is_fully_created = (
         full_response.decision == "APPROVED"
         and full_response.payment is not None
-        and full_response.payment.status == "created"
+        and full_response.payment.status in ("created", "captured")
     )
     ref_code = (
         f"REF-{full_response.transaction_id[-8:].upper()}"
@@ -63,12 +63,19 @@ def to_customer_response(full_response: PurchaseResponse) -> Dict[str, Any]:
         else None
     )
 
+    payment_url = full_response.payment.payment_url if full_response.payment else None
+    qr_code_url = full_response.payment.qr_code_url if full_response.payment else None
+    payment_method = full_response.payment.payment_method if full_response.payment else None
+
     return {
         "decision": full_response.decision,
         "product_name": product.name,
         "amount": full_response.amount,
         "reason": full_response.reason,
         "reference_code": ref_code,
+        "payment_url": payment_url,
+        "qr_code_url": qr_code_url,
+        "payment_method": payment_method,
         "requires_confirmation": full_response.requires_confirmation,
         "confirmation_token": full_response.confirmation_token,
     }
