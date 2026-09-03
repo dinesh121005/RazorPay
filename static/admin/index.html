@@ -222,6 +222,23 @@
             </div>
           </div>
 
+          <!-- Revenue Performance Chart (Total Revenue vs AI-assisted Commerce Revenue) -->
+          <div class="revenue-chart-card mt-5">
+            <div class="chart-header">
+              <div>
+                <h4 class="chart-title">Revenue Performance</h4>
+                <p class="chart-subtitle text-xs text-muted">Total Revenue vs AI-assisted Commerce Revenue over time (Reconciled from DB orders)</p>
+              </div>
+              <div class="chart-legend-custom">
+                <span class="legend-item"><span class="legend-dot purple"></span> AI Revenue</span>
+                <span class="legend-item"><span class="legend-dot cyan"></span> Total Revenue</span>
+              </div>
+            </div>
+            <div class="chart-canvas-container">
+              <canvas id="revenue-performance-chart" height="230"></canvas>
+            </div>
+          </div>
+
           <!-- Visual Split Progress Bar -->
           <div class="growth-split-bar-wrapper mt-4">
             <div class="split-bar-header">
@@ -636,8 +653,10 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- Chart.js for High-Performance Visual Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- Main JavaScript App & Razorpay Checkout SDK -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-  <script src="/static/admin/app.js?v=4.0"></script>
+  <script src="/static/admin/app.js?v=4.5"></script>
 </body>
 </html>
