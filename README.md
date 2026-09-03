@@ -46,43 +46,42 @@ The **Agentic Commerce Gateway** is a zero-trust merchant-side control plane bet
 ```mermaid
 flowchart TD
     subgraph Buyer_Plane["Buyer Intelligence (Claude / Client)"]
-        User["Human Buyer"] <-->|Prompts & Approvals| BuyerAI["Buyer AI Agent\n(Claude Desktop / Web MCP)"]
+        User["Human Buyer"] <-->|"Prompts & Approvals"| BuyerAI["Buyer AI Agent<br/>(Claude Desktop / Web MCP)"]
     end
 
     subgraph Gateway_Plane["Agentic Commerce Gateway (FastAPI Control Plane)"]
-        BuyerAI <-->|MCP / OAuth 2.1| MCP_Layer["MCP Transport Layer\n(Remote HTTP / Local STDIO)"]
-        MCP_Layer <-->|Inquire & Upsell| MerchantAI["Merchant Sales AI\n(Gemini 2.5 Flash + Grounding)"]
-        MerchantAI <-->|Real Catalog Only| Catalog["Product Catalog\n(48 Products, Multi-Merchant)"]
-        MCP_Layer -->|1. Propose Purchase| PolicyEngine{"Deterministic\nPolicy Engine"}
+        BuyerAI <-->|"MCP / OAuth 2.1"| MCP_Layer["MCP Transport Layer<br/>(Remote HTTP / Local STDIO)"]
+        MCP_Layer <-->|"Inquire & Upsell"| MerchantAI["Merchant Sales AI<br/>(Gemini 2.5 Flash + Grounding)"]
+        MerchantAI <-->|"Real Catalog Only"| Catalog["Product Catalog<br/>(48 Products, Multi-Merchant)"]
+        MCP_Layer -->|"1. Propose Purchase"| PolicyEngine{"Deterministic<br/>Policy Engine"}
         
-        PolicyEngine -->|Policy Violation| Reject["422 Policy Rejection\n(Audit Logged)"]
-        PolicyEngine -->|Over Mandate Limit\n(e.g. > ₹2,000)| HostedLink["Generate Razorpay Link\n& UPI QR Code (/checkout)"]
-        PolicyEngine -->|Under ₹500 Micro| AutoExec["Autonomous Execution\n(Auto-Paid / Pre-Authorized)"]
-        PolicyEngine -->|₹500 to Limit Gated| TokenIssuer["Sign 5-Min JWT\nConfirmation Token"]
+        PolicyEngine -->|"Policy Violation"| Reject["422 Policy Rejection<br/>(Audit Logged)"]
+        PolicyEngine -->|"Over Mandate Limit (Above ₹2,000)"| HostedLink["Generate Razorpay Link<br/>& UPI QR Code (/checkout)"]
+        PolicyEngine -->|"Under ₹500 Micro"| AutoExec["Autonomous Execution<br/>(Auto-Paid / Pre-Authorized)"]
+        PolicyEngine -->|"₹500 to Limit Gated"| TokenIssuer["Sign 5-Min JWT<br/>Confirmation Token"]
         
-        HostedLink -->|Checkout URL| BuyerAI
-        TokenIssuer -->|Quote + Token| BuyerAI
-        BuyerAI -->|Human Says YES| Confirm["confirm_purchase()"]
-        Confirm --> PolicyEngine2{"Re-Evaluate\nMandate State"}
-        PolicyEngine2 -->|Approved| RazorpayClient["Razorpay Rails"]
+        HostedLink -->|"Checkout URL"| BuyerAI
+        TokenIssuer -->|"Quote + Token"| BuyerAI
+        BuyerAI -->|"Human Says YES"| Confirm["confirm_purchase()"]
+        Confirm --> PolicyEngine2{"Re-Evaluate<br/>Mandate State"}
+        PolicyEngine2 -->|"Approved"| RazorpayClient["Razorpay Rails"]
         AutoExec --> RazorpayClient
         
-        BuyerAI <-->|Track Order / Payment| StatusCheck["check_order_status()\n& inquire_merchant()"]
+        BuyerAI <-->|"Track Order / Payment"| StatusCheck["check_order_status()<br/>& inquire_merchant()"]
         StatusCheck <--> AuditLedger
     end
 
     subgraph Payment_Plane["Razorpay & Ledger Plane"]
-        RazorpayClient -->|Create Order in Paise| RZP_API["Razorpay Test Mode API"]
+        RazorpayClient -->|"Create Order in Paise"| RZP_API["Razorpay Test Mode API"]
         HostedLink --> RZP_API
-        RZP_API -->|Order ID + Receipt| AuditLedger[("Append-Only Cryptographic\nSHA-256 Event Ledger")]
-        RZP_API -.->|Webhook: payment.captured / payment_link.paid| WebhookHandler["Webhook Processor\n(HMAC Verified + Persistent Dedup)"]
-        WebhookHandler -->|Failure Compensation| RestoreStock["Restore Inventory Stock"]
+        RZP_API -->|"Order ID + Receipt"| AuditLedger[("Append-Only Cryptographic<br/>SHA-256 Event Ledger")]
+        RZP_API -.->|"Webhook: payment.captured / payment_link.paid"| WebhookHandler["Webhook Processor<br/>(HMAC Verified + Persistent Dedup)"]
+        WebhookHandler -->|"Failure Compensation"| RestoreStock["Restore Inventory Stock"]
         WebhookHandler --> AuditLedger
     end
 
     subgraph Admin_Plane["Observability & Governance"]
-        AdminUser["Merchant Admin"] <-->|Real-Time Telemetry| AdminDash["Command Centre Dashboard\n(/admin/dashboard)"]
-        AdminDash -->|Timeline & Charts| AdminDash
+        AdminUser["Merchant Admin"] <-->|"Real-Time Telemetry"| AdminDash["Command Centre Dashboard<br/>(/admin/dashboard)"]
         AdminDash --> AuditLedger
         AdminDash --> Catalog
     end
