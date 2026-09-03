@@ -30,7 +30,11 @@ class AdminDashboard {
   }
 
   initElements() {
-    // Navigation
+    // Navigation & Sidebar
+    this.sidebar = document.getElementById("sidebar");
+    this.sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
+    this.sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
+    this.contentArea = document.querySelector(".content-area");
     this.navItems = document.querySelectorAll(".nav-item");
     this.tabPanes = document.querySelectorAll(".tab-pane");
 
@@ -96,6 +100,45 @@ class AdminDashboard {
         const tab = btn.getAttribute("data-goto-tab");
         this.switchTab(tab);
       });
+    });
+
+    // Sidebar Sliding & Collapsing (Click + Ctrl/Cmd+B shortcut)
+    const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
+    if (isCollapsed && this.sidebar) {
+      this.sidebar.classList.add("collapsed");
+    }
+
+    const toggleSidebar = () => {
+      if (!this.sidebar) return;
+      const collapsed = this.sidebar.classList.toggle("collapsed");
+      localStorage.setItem("sidebar_collapsed", collapsed);
+    };
+
+    if (this.sidebarToggleBtn) {
+      this.sidebarToggleBtn.addEventListener("click", toggleSidebar);
+    }
+    if (this.sidebarCollapseBtn) {
+      this.sidebarCollapseBtn.addEventListener("click", toggleSidebar);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    });
+
+    // Hash-based tab navigation
+    const initialHash = window.location.hash.replace("#", "");
+    if (["overview", "audit", "mandates", "catalog", "sandbox"].includes(initialHash)) {
+      this.switchTab(initialHash);
+    }
+
+    window.addEventListener("hashchange", () => {
+      const newHash = window.location.hash.replace("#", "");
+      if (["overview", "audit", "mandates", "catalog", "sandbox"].includes(newHash) && newHash !== this.currentTab) {
+        this.switchTab(newHash);
+      }
     });
 
     // Refresh button
@@ -200,12 +243,18 @@ class AdminDashboard {
 
   switchTab(tabId) {
     this.currentTab = tabId;
+    if (window.location.hash.replace("#", "") !== tabId) {
+      history.replaceState(null, "", `#${tabId}`);
+    }
     this.navItems.forEach((item) => {
       item.classList.toggle("active", item.getAttribute("data-tab") === tabId);
     });
     this.tabPanes.forEach((pane) => {
       pane.classList.toggle("active", pane.id === `tab-${tabId}`);
     });
+    if (this.contentArea) {
+      this.contentArea.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }
 
   openModal(modalId) {
