@@ -53,7 +53,10 @@ mount_remote_mcp(app, path="/mcp")
 def get_admin_dashboard():
     """Serves the interactive Admin Web Dashboard HTML application."""
     html_path = os.path.join(static_dir, "admin", "index.html")
-    return FileResponse(html_path)
+    return FileResponse(
+        html_path,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/checkout", tags=["payment"], summary="User Self-Checkout UI")
