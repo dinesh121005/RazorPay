@@ -640,13 +640,30 @@ class AuditStore:
             ]
 
     def lookup_order(self, identifier: Optional[str] = None, customer_id: Optional[str] = None) -> Optional[AuditRecord]:
-        """Looks up an order by reference code suffix, transaction_id, or razorpay_order_id."""
+        """Looks up an order by reference code suffix, transaction_id, razorpay_order_id, or product name/id."""
         if not identifier or not identifier.strip():
             latest = self.get_latest_orders(customer_id=customer_id, limit=1)
             return latest[0] if latest else None
 
         ident = identifier.strip().replace("REF-", "").replace("TX-", "")
         self._ensure_db_initialized()
+
+        # Find matching product IDs from catalog
+        matched_product_ids = []
+        try:
+            from app.catalog.data import PRODUCTS
+            ident_lower = ident.lower()
+            for p in PRODUCTS:
+                if (
+                    p.id.lower() in ident_lower
+                    or p.name.lower() in ident_lower
+                    or ident_lower in p.name.lower()
+                    or any(w in p.name.lower() for w in ident_lower.split() if len(w) > 3)
+                ):
+                    matched_product_ids.append(p.id)
+        except Exception:
+            pass
+
         query = (
             "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
             "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
@@ -656,14 +673,26 @@ class AuditStore:
             "   OR transaction_id LIKE ? "
             "   OR razorpay_order_id = ? "
             "   OR razorpay_order_id LIKE ? "
-            "ORDER BY timestamp DESC LIMIT 1;"
+            "   OR product_id = ? "
         )
+        params: List[Any] = [ident, f"%{ident}%", ident, f"%{ident}%", ident]
+
+        if matched_product_ids:
+            placeholders = ",".join("?" for _ in matched_product_ids)
+            query += f"   OR product_id IN ({placeholders}) "
+            params.extend(matched_product_ids)
+
+        # Order by payment outcome priority (captured > created) then newest timestamp
+        query += "ORDER BY (CASE WHEN payment_status = 'captured' THEN 1 WHEN payment_status = 'created' THEN 2 ELSE 3 END), timestamp DESC LIMIT 1;"
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, (ident, f"%{ident}%", ident, f"%{ident}%"))
+            cursor.execute(query, tuple(params))
             row = cursor.fetchone()
             if row is None:
-                return None
+                latest = self.get_latest_orders(customer_id=customer_id, limit=1)
+                return latest[0] if latest else None
+
             return AuditRecord(
                 transaction_id=row[0],
                 timestamp=row[1],
