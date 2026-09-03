@@ -103,15 +103,14 @@ class AdminDashboard {
     });
 
     // Sidebar Sliding & Collapsing (Click + Ctrl/Cmd+B shortcut)
-    const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
-    if (isCollapsed && this.sidebar) {
-      this.sidebar.classList.add("collapsed");
+    // Opens expanded by default for clean visual hierarchy
+    if (this.sidebar) {
+      this.sidebar.classList.remove("collapsed");
     }
 
     const toggleSidebar = () => {
       if (!this.sidebar) return;
-      const collapsed = this.sidebar.classList.toggle("collapsed");
-      localStorage.setItem("sidebar_collapsed", collapsed);
+      this.sidebar.classList.toggle("collapsed");
     };
 
     if (this.sidebarToggleBtn) {
