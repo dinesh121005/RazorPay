@@ -30,7 +30,10 @@ class AdminDashboard {
   }
 
   initElements() {
-    // Navigation
+    // Navigation & Sliding Sidebar
+    this.sidebar = document.getElementById("sidebar");
+    this.sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
+    this.sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
     this.contentArea = document.querySelector(".content-area");
     this.navItems = document.querySelectorAll(".nav-item");
     this.tabPanes = document.querySelectorAll(".tab-pane");
@@ -123,6 +126,32 @@ class AdminDashboard {
         this.switchTab(tab);
       });
     });
+
+    // Sidebar Sliding & Collapsing (Header toggle button + Chevron button + Ctrl/Cmd+B shortcut)
+    const toggleSidebar = () => {
+      if (!this.sidebar) return;
+      const collapsed = this.sidebar.classList.toggle("collapsed");
+      localStorage.setItem("sidebar_collapsed", collapsed);
+    };
+
+    if (this.sidebarToggleBtn) {
+      this.sidebarToggleBtn.addEventListener("click", toggleSidebar);
+    }
+    if (this.sidebarCollapseBtn) {
+      this.sidebarCollapseBtn.addEventListener("click", toggleSidebar);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    });
+
+    // Restore saved state if user explicitly collapsed it
+    if (localStorage.getItem("sidebar_collapsed") === "true" && this.sidebar) {
+      this.sidebar.classList.add("collapsed");
+    }
 
     // Hash-based tab navigation
     const initialHash = window.location.hash.replace("#", "");
