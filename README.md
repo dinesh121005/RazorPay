@@ -9,7 +9,7 @@
 [![Gemini](https://img.shields.io/badge/Google%20Gemini-2.5%20Flash%20AI-8E75C2.svg)](https://ai.google.dev/)
 [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-Remote%20%26%20Local-FF6F00.svg)](https://modelcontextprotocol.io/)
 [![OAuth 2.1](https://img.shields.io/badge/OAuth-2.1%20JWT%20Binding-green.svg)](https://oauth.net/2.1/)
-[![Tests](https://img.shields.io/badge/Tests-162%20Passed%20(100%25)-brightgreen.svg)](#-test-suite-verification)
+[![Tests](https://img.shields.io/badge/Tests-167%20Passed%20(100%25)-brightgreen.svg)](#-test-suite-verification)
 
 ---
 
@@ -52,7 +52,7 @@ flowchart TD
     subgraph Gateway_Plane["Agentic Commerce Gateway (FastAPI Control Plane)"]
         BuyerAI <-->|MCP / OAuth 2.1| MCP_Layer["MCP Transport Layer\n(Remote HTTP / Local STDIO)"]
         MCP_Layer <-->|Inquire & Upsell| MerchantAI["Merchant Sales AI\n(Gemini 2.5 Flash + Grounding)"]
-        MerchantAI <-->|Real Catalog Only| Catalog["Product Catalog\n(47 Products, Multi-Merchant)"]
+        MerchantAI <-->|Real Catalog Only| Catalog["Product Catalog\n(48 Products, Multi-Merchant)"]
         MCP_Layer -->|1. Propose Purchase| PolicyEngine{"Deterministic\nPolicy Engine"}
         
         PolicyEngine -->|Policy Violation| Reject["422 Policy Rejection\n(Audit Logged)"]
@@ -129,7 +129,7 @@ Spending rules are evaluated with mathematical certainty across 6 hierarchical c
 
 ## 🛠️ Model Context Protocol (MCP) Tool Suite
 
-The gateway exposes a comprehensive suite of **6 MCP tools** available over both **Remote Streamable HTTP** (`/mcp`) and **Local Stdio**:
+The gateway exposes a comprehensive suite of **8 MCP tools** (plus identity resolution for local stdio) available over both **Remote Streamable HTTP** (`/mcp`) and **Local Stdio**:
 
 | MCP Tool | Description | Inputs |
 |---|---|---|
@@ -139,6 +139,8 @@ The gateway exposes a comprehensive suite of **6 MCP tools** available over both
 | 🛒 `propose_purchase` | Proposes a purchase evaluating deterministic spend policies, returning auto-pay, confirmation tokens, or checkout links. | `product_id`, `quantity`, `customer_id` (stdio) |
 | ✅ `confirm_purchase` | Finalizes payment rails for a gated transaction using the 5-minute confirmation token. | `confirmation_token`, `customer_id` (stdio) |
 | 📦 `check_order_status` | Queries the cryptographic audit ledger for payment settlement status and order reference codes (`REF-XXXXXXXX`). | `reference_or_id`, `customer_id` (stdio) |
+| 💳 `get_spending_mandate` | Inspects customer's active spending allowance, transaction caps, allowed categories, and authorized merchants. | `customer_id` (stdio) |
+| ⚙️ `modify_spending_mandate` | Requests conversational mandate adjustments with signed two-step human confirmation tokens (`confirmation_token`). | `new_limit`, `confirmation_token`, `customer_id` (stdio) |
 | 👤 `resolve_customer` *(stdio)* | Resolves human names or emails to internal authorized customer IDs. | `identifier` |
 
 ---
@@ -155,7 +157,7 @@ The gateway exposes a comprehensive suite of **6 MCP tools** available over both
    - Claude opens the OAuth login portal (`https://razorpay-c454.onrender.com/oauth/authorize`).
    - Log in with demo credentials (Username: `dinesh`, Password: `password123`), use **Continue with Google**, or create a new account.
    - Click **Authorize Claude**.
-4. Claude now has access to all 6 gateway MCP tools with authenticated identity bound directly to your user account.
+4. Claude now has access to all 8 gateway MCP tools with authenticated identity bound directly to your user account.
 
 ---
 
@@ -194,7 +196,7 @@ Paste this into **Claude Settings ➔ Custom Instructions** (or Project Instruct
 ```markdown
 # Role: Autonomous AI Buyer & Commerce Concierge
 
-You are my personal AI Buyer Agent connected to my Razorpay Merchant Store via MCP tools (`inquire_merchant`, `search_products`, `suggest_addons`, `propose_purchase`, `confirm_purchase`, `check_order_status`).
+You are my personal AI Buyer Agent connected to my Razorpay Merchant Store via MCP tools (`inquire_merchant`, `search_products`, `suggest_addons`, `propose_purchase`, `confirm_purchase`, `check_order_status`, `get_spending_mandate`, `modify_spending_mandate`).
 
 ## Core Directives:
 
@@ -217,6 +219,10 @@ You are my personal AI Buyer Agent connected to my Razorpay Merchant Store via M
 
 5. **Order Verification**:
    - If I ask about my order status or payment receipt, call `check_order_status` to confirm settlement and delivery status.
+
+6. **Budget & Mandate Governance**:
+   - If I ask about my spending limits or remaining budget, call `get_spending_mandate`.
+   - If I ask to adjust or raise my spending limit, call `modify_spending_mandate(new_limit=...)`. Always present the confirmation challenge to me clearly and call the tool again with `confirmation_token` only when I confirm.
 ```
 
 ---
@@ -264,6 +270,18 @@ You are my personal AI Buyer Agent connected to my Razorpay Merchant Store via M
 > 2. Gateway retrieves the audit ledger record, confirms payment status as captured/paid, and reports:  
 >    `"Merchant confirmation: Order REF-XXXXXXXX for 1x Mechanical Gaming Keyboard (₹1,499.00) is CONFIRMED & PAID via Razorpay rails."`
 
+### Scenario 6: Conversational Spending Mandate Adjustment (Two-Step Human Gated)
+> **Prompt**: *"What is my spending limit, and can you raise it to ₹5,000?"*  
+> **What Happens**:
+> 1. Claude calls `get_spending_mandate()` and reports: `"Your current spending limit is ₹2,000.00."`
+> 2. Claude calls `modify_spending_mandate(new_limit=5000.0)`.
+> 3. The Gateway issues a signed confirmation challenge:  
+>    `"You are requesting to update your AI spending mandate from ₹2,000.00 to ₹5,000.00. Please confirm: Do you authorize this change?"`
+> 4. Claude presents the challenge to the user.
+> 5. Type: *"Yes, I authorize it"*.
+> 6. Claude calls `modify_spending_mandate(new_limit=5000.0, confirmation_token="...")`.
+> 7. The gateway updates the customer mandate in the database and logs a tamper-evident audit record (`CUSTOMER_MANDATE_UPDATED_CONVERSATIONAL`)!
+
 ---
 
 ## 📊 Admin Command Centre & Live Telemetry
@@ -286,7 +304,7 @@ Access the live dashboard at **`https://razorpay-c454.onrender.com/admin/dashboa
   - Inspect customer spending policies, per-transaction limits, daily allowances, allowed merchant IDs, and allowed product categories.
   - Live customer provisioning modal to create new customer accounts and mandates on the fly.
 - **Tab 5: Store Catalog**:
-  - Searchable multi-merchant catalog across 47 products in Foods, Electronics, Home & Kitchen, and Apparel with real-time stock indicators.
+  - Searchable multi-merchant catalog across 48 products in Foods, Electronics, Home & Kitchen, and Apparel with real-time stock indicators.
 - **Tab 6: Agent Sandbox**:
   - Interactive simulator allowing judges to test natural language inquiries, purchase proposals, human approval gating, and token confirmations in a single click.
 
@@ -294,26 +312,27 @@ Access the live dashboard at **`https://razorpay-c454.onrender.com/admin/dashboa
 
 ## 🧪 Test Suite Verification
 
-The repository includes **162 automated unit and integration tests with a 100% pass rate**:
+The repository includes **167 automated unit and integration tests with a 100% pass rate**:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
 ```
-============================== 162 passed in 90s ==============================
-- tests/test_policy_engine.py          : 23 passed (Boundary limits, expiry, category whitelists, daily caps)
+============================== 167 passed in 90s ==============================
+- tests/test_mcp.py                    : 26 passed (Local STDIO tools, confirmation gating, check_order_status, idempotency)
+- tests/test_policy_engine.py          : 25 passed (Boundary limits, expiry, category whitelists, daily caps)
 - tests/test_payments.py               : 22 passed (Razorpay orders, webhooks, persistent DB dedup, stock restore, payment links)
-- tests/test_audit.py                  : 14 passed (Immutable SQLite/Postgres logging, hash chaining, GET /audit/anchor)
-- tests/test_oauth.py                  : 17 passed (JWT tokens, PBKDF2 hashing, refresh grants, sub claims)
-- tests/test_merchant_agent.py         : 11 passed (Gemini LLM reasoning, quote grounding, add-on recommendations)
-- tests/test_mcp.py                    : 25 passed (Local STDIO tools, confirmation gating, check_order_status, idempotency)
-- tests/test_mcp_remote.py             : 8 passed  (Streamable HTTP, auth headers, token isolation)
 - tests/test_agent_router.py           : 16 passed (Auth-protected purchasing, confirmation tokens, replay immunity)
-- tests/test_admin.py                  : 10 passed (Mandate updates, customer provisioning, admin security)
-- tests/test_dashboard.py              : 3 passed  (HTML dashboard, static CSS/JS serving)
-- tests/test_catalog.py                : 10 passed (Product filtering, multi-token search, 47-product catalog)
+- tests/test_oauth.py                  : 16 passed (JWT tokens, PBKDF2 hashing, refresh grants, sub claims)
+- tests/test_admin.py                  : 13 passed (Mandate updates, customer provisioning, admin security)
+- tests/test_merchant_agent.py         : 10 passed (Gemini LLM reasoning, quote grounding, add-on recommendations)
+- tests/test_audit.py                  : 9 passed  (Immutable SQLite/Postgres logging, hash chaining, GET /audit/anchor)
+- tests/test_catalog.py                : 9 passed  (Product filtering, multi-token search, 48-product catalog)
+- tests/test_mcp_remote.py             : 8 passed  (Streamable HTTP, auth headers, token isolation)
+- tests/test_customer_mandate.py       : 5 passed  (Conversational mandate queries, two-step human gating tokens)
 - tests/test_google_oauth_and_signup.py: 5 passed  (Google SSO redirect, self-service registration, auto-provisioning)
+- tests/test_dashboard.py              : 3 passed  (HTML dashboard, static CSS/JS serving)
 ```
 
 ---
@@ -332,7 +351,7 @@ RazorPay/
 │   │   └── router.py            # Admin customer management & mandate update endpoints
 │   ├── catalog/
 │   │   ├── models.py            # Product Pydantic schema
-│   │   ├── data.py              # 47 products across Foods, Electronics, Home & Apparel
+│   │   ├── data.py              # 48 products across Foods, Electronics, Home & Apparel
 │   │   ├── service.py           # Catalog search, lookup, and stock management
 │   │   └── router.py            # GET /products, GET /products/{id}
 │   ├── agent/
@@ -344,7 +363,7 @@ RazorPay/
 │   │   ├── service.py           # Gemini reasoning, quote grounding & smart add-on engine
 │   │   └── router.py            # POST /merchant/inquire, POST /merchant/recommend-addons
 │   ├── mcp/
-│   │   ├── tools.py             # 6 MCP tools (propose, confirm, suggest_addons, check_status)
+│   │   ├── tools.py             # 8 MCP tools (propose, confirm, suggest_addons, check_status, mandates)
 │   │   └── server.py            # Local STDIO & Remote Streamable HTTP MCP server (/mcp)
 │   ├── policy/
 │   │   ├── mandate.py           # Mandate schema (max_transaction_amount, daily_limit, expiry)
@@ -368,7 +387,7 @@ RazorPay/
 ├── static/
 │   ├── admin/                   # Admin Command Centre UI (HTML, CSS, JS with Chart.js)
 │   └── checkout/                # Standalone Razorpay Checkout & UPI QR Code UI
-├── tests/                       # 162 automated unit & integration tests
+├── tests/                       # 167 automated unit & integration tests
 ├── .env.example                 # Environment variables template
 ├── requirements.txt             # Pinned project dependencies
 └── README.md                    # Master Project Documentation
@@ -392,7 +411,7 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 # Edit .env with your RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and GEMINI_API_KEY
 
-# 4. Run automated test suite (162 tests)
+# 4. Run automated test suite (167 tests)
 pytest -v
 
 # 5. Start development server
@@ -411,4 +430,4 @@ uvicorn app.main:app --reload --port 8000
 | **Safety & Controls** | Deterministic 6-tier policy engine, signed 5-minute JWT confirmation tokens, token replay immunity, pre-execution policy re-validation, and mandate escalation links. |
 | **Razorpay Implementation** | Sub-unit paise conversion, HMAC-SHA256 signature verification, persistent database webhook deduplication (`payment.captured` and `payment_link.paid`), automated stock restoration, and hosted `/checkout` interface. |
 | **Audit & Governance** | Cryptographically verified SHA-256 append-only ledger (`GET /audit/verify`, `GET /audit/anchor`) and real-time Admin Command Centre telemetry with interactive revenue charts. |
-| **Engineering Quality** | 162 tests passing (100%), full type annotations, dual transport MCP (Local Stdio + Remote HTTP), and PostgreSQL/SQLite universal compatibility. |
+| **Engineering Quality** | 167 tests passing (100%), full type annotations, dual transport MCP (Local Stdio + Remote HTTP), and PostgreSQL/SQLite universal compatibility. |
