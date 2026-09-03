@@ -387,52 +387,6 @@ class AdminDashboard {
     if (this.kpiMandateCount) this.kpiMandateCount.textContent = this.mandates ? this.mandates.length : 0;
     if (this.auditCountBadge) this.auditCountBadge.textContent = totalTx;
 
-    // =========================================================================
-    // Track 01: AI Revenue Growth & Attribution Engine Calculations
-    // Reconciled directly from live Database Orders & Audit Records
-    // =========================================================================
-    const aiAssistedRatio = 0.54;
-    const aiAttributedVolume = totalSettledVolume > 0 
-      ? Math.round(totalSettledVolume * aiAssistedRatio * 100) / 100 
-      : 0;
-    const baselineVolume = Math.round((totalSettledVolume - aiAttributedVolume) * 100) / 100;
-
-    const totalOrders = settledRecords.length;
-    const aiOrdersCount = totalOrders > 0 ? Math.max(1, Math.round(totalOrders * 0.58)) : 0;
-    const baselineOrdersCount = Math.max(1, totalOrders - aiOrdersCount);
-
-    // Baseline single-item orders average vs AI-assisted expanded basket AOV
-    const baselineAOV = baselineOrdersCount > 0 && baselineVolume > 0 
-      ? Math.round(baselineVolume / baselineOrdersCount) 
-      : 1350;
-    // AI-Assisted AOV has cross-sell / add-on expansion (+48% AOV lift)
-    const aiAOV = baselineAOV > 0 
-      ? Math.round(baselineAOV * 1.48) 
-      : 1998;
-    const aovLiftPct = baselineAOV > 0 
-      ? Math.round(((aiAOV - baselineAOV) / baselineAOV) * 100) 
-      : 48;
-    const extraMargin = Math.max(0, aiAOV - baselineAOV);
-    const aiSharePct = totalSettledVolume > 0 ? 54 : 0;
-    const baselineSharePct = 100 - aiSharePct;
-    const attachRatePct = totalOrders > 0 ? Math.min(45, Math.max(28, Math.round((aiOrdersCount / totalOrders) * 62))) : 36;
-
-    if (this.growthAovLift) this.growthAovLift.textContent = `+${aovLiftPct}%`;
-    if (this.growthBaselineRev) this.growthBaselineRev.textContent = `₹${baselineVolume.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-    if (this.growthBaselineSub) this.growthBaselineSub.textContent = `${baselineOrdersCount} direct single-item purchases`;
-    if (this.growthAiRev) this.growthAiRev.textContent = `+₹${aiAttributedVolume.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-    if (this.growthAiShare) this.growthAiShare.textContent = `${aiSharePct}% of settled revenue (${aiOrdersCount} AI orders)`;
-    if (this.growthBaselineAov) this.growthBaselineAov.textContent = `₹${baselineAOV.toLocaleString("en-IN")}`;
-    if (this.growthAiAov) this.growthAiAov.textContent = `₹${aiAOV.toLocaleString("en-IN")}`;
-    if (this.growthAovSub) this.growthAovSub.textContent = `+₹${extraMargin.toLocaleString("en-IN")} extra margin / basket`;
-    if (this.growthAttachRate) this.growthAttachRate.textContent = `${attachRatePct}%`;
-    if (this.growthSplitRatio) this.growthSplitRatio.textContent = `${baselineSharePct}% Baseline / ${aiSharePct}% AI Lift`;
-    if (this.splitBaselineBar) this.splitBaselineBar.style.width = `${baselineSharePct}%`;
-    if (this.splitAiBar) this.splitAiBar.style.width = `${aiSharePct}%`;
-
-    // Render the interactive Revenue Performance Area Chart
-    this.renderRevenueChart(settledRecords, totalSettledVolume, aiAttributedVolume);
-
     // Render recent snippet
     if (this.recentTbody) {
       const recent = (this.auditRecords || []).slice(0, 6);
