@@ -186,7 +186,9 @@ def test_dynamic_customer_immediate_purchase_execution(admin_headers):
     assert confirm_data["product_id"] == "MN001"
     assert confirm_data["amount"] == 4999.0
     assert confirm_data["mandate_limit"] == 6000.0
-    assert confirm_data["payment"]["status"] == "created"
+    assert confirm_data["payment"]["status"] == "captured"
+    assert confirm_data["payment"]["razorpay_payment_id"] is not None
+    assert confirm_data["payment"]["razorpay_payment_id"].startswith("pay_mandate_")
 
 
 def test_mandate_limit_patch_immediately_unlocks_purchase(admin_headers):

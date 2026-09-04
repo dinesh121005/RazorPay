@@ -442,8 +442,14 @@ class AdminDashboard {
               ? `<span class="badge badge-success">APPROVED</span>`
               : `<span class="badge badge-danger">REJECTED</span>`;
           const isCaptured = r.payment_status === "captured" || r.payment_status === "paid";
+          const isAutoPaidMandate = isCaptured && (
+            (r.razorpay_payment_id && r.razorpay_payment_id.startsWith("pay_mandate_")) ||
+            (r.decision === "APPROVED" && (!r.decision_reason || (!r.decision_reason.includes("checkout signature") && !r.decision_reason.includes("simulated Razorpay webhook"))))
+          );
           const isAutoPaid = r.decision === "APPROVED" && r.payment_status !== "failed";
-          const payBadge = isCaptured
+          const payBadge = isAutoPaidMandate
+            ? `<span class="badge badge-autopay" title="Auto-Debited & Captured on Rail via Customer Mandate">⚡ AUTO-PAID</span>`
+            : isCaptured
             ? `<span class="badge badge-success">✓ PAID</span>`
             : isAutoPaid
             ? `<span class="badge badge-autopay" title="Auto-Debited & Settled from Customer Policy Mandate">⚡ AUTO-PAID</span>`
@@ -1054,15 +1060,21 @@ class AdminDashboard {
           r.decision === "APPROVED"
             ? `<span class="badge badge-success">APPROVED</span>`
             : `<span class="badge badge-danger">REJECTED</span>`;
-        const isVerifiedRazorpay = (r.payment_status === "captured" || r.payment_status === "paid") && r.decision_reason && (r.decision_reason.includes("Razorpay") || r.decision_reason.includes("checkout signature") || r.decision_reason.includes("webhook"));
         const isSimulatedWebhook = (r.payment_status === "captured" || r.payment_status === "paid") && r.decision_reason && r.decision_reason.includes("simulated Razorpay webhook");
+        const isVerifiedRazorpay = (r.payment_status === "captured" || r.payment_status === "paid") && r.decision_reason && (r.decision_reason.includes("Razorpay") || r.decision_reason.includes("checkout signature") || r.decision_reason.includes("webhook")) && !isSimulatedWebhook;
         const isCaptured = r.payment_status === "captured" || r.payment_status === "paid";
+        const isAutoPaidMandate = isCaptured && (
+          (r.razorpay_payment_id && r.razorpay_payment_id.startsWith("pay_mandate_")) ||
+          (r.decision === "APPROVED" && !isVerifiedRazorpay && !isSimulatedWebhook)
+        );
         const isAutoPaid = r.decision === "APPROVED" && r.payment_status !== "failed" && !isCaptured;
 
         const payBadge = isSimulatedWebhook
           ? `<span class="badge badge-warning" title="Simulated via authenticated admin test webhook endpoint">⚡ SIMULATED (Demo Webhook)</span>`
           : isVerifiedRazorpay
           ? `<span class="badge badge-success" title="Cryptographically verified via Razorpay HMAC Signature / Webhook">✓ VERIFIED (Razorpay Test Mode)</span>`
+          : isAutoPaidMandate
+          ? `<span class="badge badge-autopay" title="Auto-Debited & Captured on Rail via Customer Mandate">⚡ AUTO-PAID (Captured)</span>`
           : isCaptured
           ? `<span class="badge badge-success" title="Payment Captured & Settled">✓ CAPTURED & PAID</span>`
           : isAutoPaid

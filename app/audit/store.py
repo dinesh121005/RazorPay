@@ -114,6 +114,7 @@ class AuditStore:
                     decision_reason TEXT NOT NULL,
                     payment_status TEXT,
                     razorpay_order_id TEXT,
+                    razorpay_payment_id TEXT,
                     idempotency_key TEXT UNIQUE,
                     prev_hash TEXT DEFAULT 'GENESIS',
                     record_hash TEXT
@@ -123,6 +124,11 @@ class AuditStore:
             cursor.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_idempotency_key ON audit_records(idempotency_key);"
             )
+            try:
+                cursor.execute("ALTER TABLE audit_records ADD COLUMN razorpay_payment_id TEXT;")
+                conn.commit()
+            except Exception:
+                pass
 
             # Append-only cryptographic ledger
             cursor.execute(
@@ -245,9 +251,9 @@ class AuditStore:
                 INSERT INTO audit_records (
                     transaction_id, timestamp, customer_id, product_id,
                     merchant_id, quantity, amount, decision, decision_reason,
-                    payment_status, razorpay_order_id, idempotency_key,
+                    payment_status, razorpay_order_id, razorpay_payment_id, idempotency_key,
                     prev_hash, record_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?);
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?);
                 """,
                 (
                     transaction_id,
@@ -272,6 +278,7 @@ class AuditStore:
         transaction_id: str,
         payment_status: Optional[str],
         razorpay_order_id: Optional[str] = None,
+        razorpay_payment_id: Optional[str] = None,
     ) -> None:
         """
         Phase B: Append an immutable event to the append-only `audit_events` ledger
@@ -306,6 +313,7 @@ class AuditStore:
             payload = {
                 "payment_status": payment_status,
                 "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": razorpay_payment_id,
                 "decision": final_decision,
             }
             new_rec_hash, _ = self._append_event(
@@ -318,10 +326,10 @@ class AuditStore:
             cursor.execute(
                 """
                 UPDATE audit_records
-                SET payment_status = ?, razorpay_order_id = ?, decision = ?, record_hash = ?
+                SET payment_status = ?, razorpay_order_id = ?, razorpay_payment_id = COALESCE(?, razorpay_payment_id), decision = ?, record_hash = ?
                 WHERE transaction_id = ?;
                 """,
-                (payment_status, razorpay_order_id, final_decision, new_rec_hash, transaction_id)
+                (payment_status, razorpay_order_id, razorpay_payment_id, final_decision, new_rec_hash, transaction_id)
             )
             conn.commit()
 
@@ -460,7 +468,7 @@ class AuditStore:
         self._ensure_db_initialized()
         query = (
             "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
-            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
+            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, razorpay_payment_id, idempotency_key, "
             "prev_hash, record_hash "
             "FROM audit_records"
         )
@@ -499,9 +507,10 @@ class AuditStore:
                     decision_reason=row[8],
                     payment_status=row[9],
                     razorpay_order_id=row[10],
-                    idempotency_key=row[11] if len(row) > 11 else None,
-                    prev_hash=row[12] if len(row) > 12 else "GENESIS",
-                    record_hash=row[13] if len(row) > 13 else None,
+                    razorpay_payment_id=row[11],
+                    idempotency_key=row[12] if len(row) > 12 else None,
+                    prev_hash=row[13] if len(row) > 13 else "GENESIS",
+                    record_hash=row[14] if len(row) > 14 else None,
                 )
                 for row in rows
             ]
@@ -511,7 +520,7 @@ class AuditStore:
         self._ensure_db_initialized()
         query = (
             "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
-            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
+            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, razorpay_payment_id, idempotency_key, "
             "prev_hash, record_hash "
             "FROM audit_records "
             "WHERE transaction_id = ?;"
@@ -534,9 +543,10 @@ class AuditStore:
                 decision_reason=row[8],
                 payment_status=row[9],
                 razorpay_order_id=row[10],
-                idempotency_key=row[11] if len(row) > 11 else None,
-                prev_hash=row[12] if len(row) > 12 else "GENESIS",
-                record_hash=row[13] if len(row) > 13 else None,
+                razorpay_payment_id=row[11],
+                idempotency_key=row[12] if len(row) > 12 else None,
+                prev_hash=row[13] if len(row) > 13 else "GENESIS",
+                record_hash=row[14] if len(row) > 14 else None,
             )
 
     def get_by_idempotency_key(self, idempotency_key: str) -> Optional[AuditRecord]:
@@ -547,7 +557,7 @@ class AuditStore:
         self._ensure_db_initialized()
         query = (
             "SELECT transaction_id, timestamp, customer_id, product_id, merchant_id, "
-            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, idempotency_key, "
+            "quantity, amount, decision, decision_reason, payment_status, razorpay_order_id, razorpay_payment_id, idempotency_key, "
             "prev_hash, record_hash "
             "FROM audit_records "
             "WHERE idempotency_key = ?;"
@@ -570,9 +580,10 @@ class AuditStore:
                 decision_reason=row[8],
                 payment_status=row[9],
                 razorpay_order_id=row[10],
-                idempotency_key=row[11] if len(row) > 11 else None,
-                prev_hash=row[12] if len(row) > 12 else "GENESIS",
-                record_hash=row[13] if len(row) > 13 else None,
+                razorpay_payment_id=row[11],
+                idempotency_key=row[12] if len(row) > 12 else None,
+                prev_hash=row[13] if len(row) > 13 else "GENESIS",
+                record_hash=row[14] if len(row) > 14 else None,
             )
 
     def is_webhook_processed(self, event_id: str) -> bool:

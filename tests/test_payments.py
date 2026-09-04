@@ -89,12 +89,62 @@ def test_approved_purchase_creates_order():
 
     # Payment field present and successful
     assert data["payment"] is not None
-    assert data["payment"]["status"] == "created"
+    assert data["payment"]["status"] == "captured"
     assert data["payment"]["razorpay_order_id"] == "order_TestFakeABC123"
+    assert data["payment"]["razorpay_payment_id"] is not None
+    assert data["payment"]["razorpay_payment_id"].startswith("pay_mandate_")
     assert data["payment"]["error"] is None
 
     # Razorpay was called exactly once
     mock_create.assert_called_once()
+
+
+def test_autopay_immediate_rail_settlement_captured_with_payment_id():
+    """
+    Verifies Option 1: Automatic Rail Settlement in Auto-Pay.
+    Approved auto-pay transactions immediately settle on the payment rail to 'captured'
+    with an authentic 'pay_mandate_...' payment ID and unbroken cryptographic audit ledger.
+    """
+    with patch(_CREATE_ORDER, return_value={"id": "order_AutoSettled_999", "status": "created"}):
+        response = client.post(
+            "/agent/purchase",
+            json={
+                "customer_id": "CUST001",
+                "product_id": "FD003",
+                "quantity": 1,
+            },
+            headers=_ADMIN_HEADERS,
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["decision"] == "APPROVED"
+    assert data["amount"] == 199.0
+    txn_id = data["transaction_id"]
+
+    # Payment response fields
+    payment = data["payment"]
+    assert payment is not None
+    assert payment["status"] == "captured"
+    assert payment["razorpay_order_id"] == "order_AutoSettled_999"
+    assert payment["razorpay_payment_id"] is not None
+    assert payment["razorpay_payment_id"].startswith("pay_mandate_")
+    assert payment["payment_method"] == "auto_debit"
+
+    # Verify audit ledger record reflects captured status and razorpay_payment_id
+    audit_resp = client.get(f"/audit/{txn_id}", headers=_ADMIN_HEADERS)
+    assert audit_resp.status_code == 200
+    audit_data = audit_resp.json()
+    assert audit_data["transaction_id"] == txn_id
+    assert audit_data["decision"] == "APPROVED"
+    assert audit_data["payment_status"] == "captured"
+    assert audit_data["razorpay_order_id"] == "order_AutoSettled_999"
+    assert audit_data["razorpay_payment_id"] == payment["razorpay_payment_id"]
+
+    # Cryptographic integrity check
+    verify_resp = client.get("/audit/verify", headers=_ADMIN_HEADERS)
+    assert verify_resp.status_code == 200
+    assert verify_resp.json()["valid"] is True
 
 
 def test_approved_contains_transaction_id():

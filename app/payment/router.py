@@ -213,6 +213,7 @@ def verify_payment(payload: PaymentVerificationRequest):
             transaction_id=payload.receipt,
             payment_status="captured",
             razorpay_order_id=payload.razorpay_order_id or payload.razorpay_payment_id,
+            razorpay_payment_id=payload.razorpay_payment_id,
         )
         # If the original proposal was REJECTED/escalated to checkout, mark APPROVED now that payment is captured
         if record.decision == "REJECTED":
@@ -323,10 +324,15 @@ async def razorpay_webhook(
         record = audit_store.get(transaction_id)
         if record:
             if event in ("payment.captured", "order.paid", "payment_link.paid"):
+                webhook_payment_id = (
+                    payload_obj.get("payment", {}).get("entity", {}).get("id")
+                    or (entity.get("id") if str(entity.get("id", "")).startswith("pay_") else None)
+                )
                 audit_store.update_payment_outcome(
                     transaction_id=transaction_id,
                     payment_status="captured",
                     razorpay_order_id=order_id,
+                    razorpay_payment_id=webhook_payment_id,
                 )
                 if record.decision == "REJECTED":
                     with audit_store._get_connection() as conn:
@@ -397,6 +403,7 @@ def simulate_webhook(payload: SimulateWebhookRequest):
         transaction_id=clean_tx,
         payment_status="captured",
         razorpay_order_id=order_id,
+        razorpay_payment_id=payment_id,
     )
 
     if record.decision == "REJECTED":

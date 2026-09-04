@@ -15,6 +15,10 @@ class PaymentResult(BaseModel):
         default=None,
         description="Razorpay order ID (e.g. 'order_ABC123') returned on creation attempt."
     )
+    razorpay_payment_id: Optional[str] = Field(
+        default=None,
+        description="Razorpay payment ID (e.g. 'pay_ABC123') returned on payment capture/settlement."
+    )
     payment_url: Optional[str] = Field(
         default=None,
         description="Razorpay hosted payment link URL (e.g. 'https://rzp.io/i/xxxx') for customer self-checkout."

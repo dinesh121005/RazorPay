@@ -58,6 +58,10 @@ class AuditRecord(BaseModel):
         default=None,
         description="Razorpay Order ID (e.g. 'order_ABC123') when payment order creation succeeded, else None"
     )
+    razorpay_payment_id: Optional[str] = Field(
+        default=None,
+        description="Razorpay Payment ID (e.g. 'pay_ABC123') when payment capture succeeded, else None"
+    )
     idempotency_key: Optional[str] = Field(
         default=None,
         description="Optional client-supplied idempotency key for replay prevention"

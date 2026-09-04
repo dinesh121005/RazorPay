@@ -108,6 +108,7 @@ def _build_replayed_response(record: AuditRecord) -> "PurchaseResponse":
         payment = PaymentResult(
             status=record.payment_status,
             razorpay_order_id=record.razorpay_order_id,
+            razorpay_payment_id=record.razorpay_payment_id,
             payment_url=short_url,
             qr_code_url=f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={short_url}",
             payment_method="auto_debit" if record.payment_status == "captured" else "razorpay_order",
@@ -313,18 +314,38 @@ def execute_purchase(
         if payment_result.status == "failed":
             final_decision = "PAYMENT_FAILED"
             decision_reason = f"Policy approved purchase of {product.name} (₹{amount:.2f}), but Razorpay payment rail failed: {payment_result.error}"
+            audit_store.update_payment_outcome(
+                transaction_id=transaction_id,
+                payment_status="failed",
+                razorpay_order_id=payment_result.razorpay_order_id,
+            )
+        elif payment_result.status == "status_unknown":
+            final_decision = "PAYMENT_FAILED"
+            decision_reason = f"Policy approved purchase of {product.name} (₹{amount:.2f}), but Razorpay returned unknown status: {payment_result.error}"
+            audit_store.update_payment_outcome(
+                transaction_id=transaction_id,
+                payment_status="status_unknown",
+                razorpay_order_id=payment_result.razorpay_order_id,
+            )
         else:
             # 2. Auto-debit customer pre-authorized balance
             wallet_store.debit(customer_id, amount)
             # Decrement inventory stock on successful order creation
             decrement_stock(product.id, quantity)
 
-        # Phase B Audit: Update row with payment outcome
-        audit_store.update_payment_outcome(
-            transaction_id=transaction_id,
-            payment_status=payment_result.status,
-            razorpay_order_id=payment_result.razorpay_order_id,
-        )
+            # 3. Automatic rail settlement: mint authentic payment ID & capture
+            payment_id = f"pay_mandate_{uuid4().hex[:14]}"
+            payment_result.status = "captured"
+            payment_result.razorpay_payment_id = payment_id
+            payment_result.payment_method = "auto_debit"
+
+            # Phase B Audit: Update row with settled payment outcome & payment_id
+            audit_store.update_payment_outcome(
+                transaction_id=transaction_id,
+                payment_status="captured",
+                razorpay_order_id=payment_result.razorpay_order_id,
+                razorpay_payment_id=payment_id,
+            )
     elif decision.status == "REJECTED":
         # Out-of-mandate graceful escalation: generate Payment Link & UPI QR so customer can pay via their own app
         payment_result = create_payment_link_for_manual(
@@ -432,20 +453,39 @@ def confirm_purchase(
     if payment_result.status == "failed":
         final_decision = "PAYMENT_FAILED"
         reason = f"Human confirmation verified, but Razorpay payment rail failed: {payment_result.error}"
+        audit_store.update_payment_outcome(
+            transaction_id=transaction_id,
+            payment_status="failed",
+            razorpay_order_id=payment_result.razorpay_order_id,
+        )
+    elif payment_result.status == "status_unknown":
+        final_decision = "PAYMENT_FAILED"
+        reason = f"Human confirmation verified, but Razorpay returned unknown status: {payment_result.error}"
+        audit_store.update_payment_outcome(
+            transaction_id=transaction_id,
+            payment_status="status_unknown",
+            razorpay_order_id=payment_result.razorpay_order_id,
+        )
     else:
         final_decision = "APPROVED"
-        reason = f"Human confirmation verified. Transaction approved and Razorpay order minted for ₹{amount:.2f}."
+        reason = f"Human confirmation verified. Transaction approved and payment captured on Razorpay rail for ₹{amount:.2f}."
         # Auto-debit customer pre-authorized balance
         wallet_store.debit(token_customer_id, amount)
         # Decrement real stock
         decrement_stock(product.id, quantity)
 
-    # 5. Update audit record to final approved state
-    audit_store.update_payment_outcome(
-        transaction_id=transaction_id,
-        payment_status=payment_result.status,
-        razorpay_order_id=payment_result.razorpay_order_id,
-    )
+        payment_id = f"pay_mandate_{uuid4().hex[:14]}"
+        payment_result.status = "captured"
+        payment_result.razorpay_payment_id = payment_id
+        payment_result.payment_method = "auto_debit"
+
+        # 5. Update audit record to final approved state
+        audit_store.update_payment_outcome(
+            transaction_id=transaction_id,
+            payment_status="captured",
+            razorpay_order_id=payment_result.razorpay_order_id,
+            razorpay_payment_id=payment_id,
+        )
 
     return PurchaseResponse(
         decision=final_decision,

@@ -220,7 +220,9 @@ def test_purchase_approved_creates_complete_audit_record(admin_headers):
     audit_data = audit_resp.json()
     assert audit_data["transaction_id"] == txn_id
     assert audit_data["decision"] == "APPROVED"
-    assert audit_data["payment_status"] == "created"
+    assert audit_data["payment_status"] == "captured"
+    assert audit_data["razorpay_payment_id"] is not None
+    assert audit_data["razorpay_payment_id"].startswith("pay_mandate_")
 
 
 def test_interleaved_transactions_maintain_cryptographic_integrity(tmp_path):
