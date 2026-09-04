@@ -3,7 +3,8 @@
     "total_synthetic_sessions": 50,
     "evaluated_sessions": 47,
     "target_track": "Track 01: AI Growth & Transactable Merchants",
-    "model_tested": "MerchantAgentService with Cross-Sell Affinity & Budget Headroom Guardrails"
+    "model_tested": "MerchantAgentService with Dynamic Headroom & Cross-Sell Growth Engine",
+    "data_transparency_note": "Transparent per-transaction telemetry: baseline basket, accepted add-on, budget headroom saved/used, and AOV attribution."
   },
   "empirical_metrics": {
     "average_baseline_aov_inr": 708.53,
@@ -13,189 +14,999 @@
     "budget_compliance_rate_percentage": 100.0,
     "zero_budget_violations_guarantee": true
   },
-  "sample_sessions": [
+  "per_transaction_telemetry": [
     {
       "session_id": 1,
       "query": "mechanical gaming keyboard for coding",
-      "budget": 2000.0,
+      "budget_ceiling_inr": 2000.0,
       "base_product": {
         "id": "KB001",
         "name": "Mechanical Gaming Keyboard",
         "price": 1499.0
       },
-      "addon": {
+      "accepted_addon": {
         "product_id": "HK001",
         "name": "Ceramic Coffee Mug (350ml)",
         "price": 499.0
       },
-      "base_basket_value": 1499.0,
-      "upsold_basket_value": 1998.0,
-      "absolute_lift": 499.0,
-      "percentage_lift": 33.29,
+      "base_basket_inr": 1499.0,
+      "gross_basket_inr": 1998.0,
+      "headroom_used_inr": 499.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 33.29,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     },
     {
       "session_id": 2,
       "query": "wireless mouse for work",
-      "budget": 1500.0,
+      "budget_ceiling_inr": 1500.0,
       "base_product": {
         "id": "EL001",
         "name": "Ergonomic Wireless Optical Mouse",
         "price": 899.0
       },
-      "addon": {
+      "accepted_addon": {
         "product_id": "EL006",
         "name": "Braided USB-C Fast Charging Cable (2m)",
         "price": 399.0
       },
-      "base_basket_value": 899.0,
-      "upsold_basket_value": 1298.0,
-      "absolute_lift": 399.0,
-      "percentage_lift": 44.38,
+      "base_basket_inr": 899.0,
+      "gross_basket_inr": 1298.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 202.0,
+      "transaction_lift_percentage": 44.38,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     },
     {
       "session_id": 3,
       "query": "ceramic coffee mug for desk",
-      "budget": 800.0,
+      "budget_ceiling_inr": 800.0,
       "base_product": {
         "id": "HK001",
         "name": "Ceramic Coffee Mug (350ml)",
         "price": 499.0
       },
-      "addon": null,
-      "base_basket_value": 499.0,
-      "upsold_basket_value": 499.0,
-      "absolute_lift": 0.0,
-      "percentage_lift": 0.0,
+      "accepted_addon": null,
+      "base_basket_inr": 499.0,
+      "gross_basket_inr": 499.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 301.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "AUTO_APPROVED",
       "within_budget": true
     },
     {
       "session_id": 4,
       "query": "insulated water bottle",
-      "budget": 1200.0,
+      "budget_ceiling_inr": 1200.0,
       "base_product": {
         "id": "HK002",
         "name": "Salem Stainless Steel Water Bottle (1L)",
         "price": 899.0
       },
-      "addon": null,
-      "base_basket_value": 899.0,
-      "upsold_basket_value": 899.0,
-      "absolute_lift": 0.0,
-      "percentage_lift": 0.0,
+      "accepted_addon": null,
+      "base_basket_inr": 899.0,
+      "gross_basket_inr": 899.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 301.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     },
     {
       "session_id": 5,
       "query": "filter coffee powder degree",
-      "budget": 600.0,
+      "budget_ceiling_inr": 600.0,
       "base_product": {
         "id": "FD007",
         "name": "Kumbakonam Degree Filter Coffee Blend (500g)",
         "price": 420.0
       },
-      "addon": {
+      "accepted_addon": {
         "product_id": "FD011",
         "name": "Manapparai Crispy Garlic Butter Murukku (250g)",
         "price": 149.0
       },
-      "base_basket_value": 420.0,
-      "upsold_basket_value": 569.0,
-      "absolute_lift": 149.0,
-      "percentage_lift": 35.48,
+      "base_basket_inr": 420.0,
+      "gross_basket_inr": 569.0,
+      "headroom_used_inr": 149.0,
+      "headroom_saved_inr": 31.0,
+      "transaction_lift_percentage": 35.48,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     },
     {
       "session_id": 6,
       "query": "cold pressed coconut oil",
-      "budget": 900.0,
+      "budget_ceiling_inr": 900.0,
       "base_product": {
         "id": "FD001",
         "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
         "price": 349.0
       },
-      "addon": {
+      "accepted_addon": {
         "product_id": "FD002",
         "name": "Organic Rolled Oats & Samai Millet (1kg)",
         "price": 299.0
       },
-      "base_basket_value": 349.0,
-      "upsold_basket_value": 648.0,
-      "absolute_lift": 299.0,
-      "percentage_lift": 85.67,
+      "base_basket_inr": 349.0,
+      "gross_basket_inr": 648.0,
+      "headroom_used_inr": 299.0,
+      "headroom_saved_inr": 252.0,
+      "transaction_lift_percentage": 85.67,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     },
     {
       "session_id": 7,
       "query": "healthy rolled oats breakfast",
-      "budget": 700.0,
+      "budget_ceiling_inr": 700.0,
       "base_product": {
         "id": "FD002",
         "name": "Organic Rolled Oats & Samai Millet (1kg)",
         "price": 299.0
       },
-      "addon": {
+      "accepted_addon": {
         "product_id": "FD001",
         "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
         "price": 349.0
       },
-      "base_basket_value": 299.0,
-      "upsold_basket_value": 648.0,
-      "absolute_lift": 349.0,
-      "percentage_lift": 116.72,
+      "base_basket_inr": 299.0,
+      "gross_basket_inr": 648.0,
+      "headroom_used_inr": 349.0,
+      "headroom_saved_inr": 52.0,
+      "transaction_lift_percentage": 116.72,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     },
     {
       "session_id": 8,
       "query": "cotton crew neck t-shirt",
-      "budget": 1000.0,
+      "budget_ceiling_inr": 1000.0,
       "base_product": {
         "id": "AP001",
         "name": "Tiruppur Organic Cotton Crew T-Shirt",
         "price": 799.0
       },
-      "addon": null,
-      "base_basket_value": 799.0,
-      "upsold_basket_value": 799.0,
-      "absolute_lift": 0.0,
-      "percentage_lift": 0.0,
+      "accepted_addon": null,
+      "base_basket_inr": 799.0,
+      "gross_basket_inr": 799.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 201.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     },
     {
       "session_id": 9,
       "query": "french press coffee maker",
-      "budget": 1800.0,
+      "budget_ceiling_inr": 1800.0,
       "base_product": {
         "id": "HK005",
         "name": "French Press Coffee & Tea Maker (600ml)",
         "price": 999.0
       },
-      "addon": {
+      "accepted_addon": {
         "product_id": "FD007",
         "name": "Kumbakonam Degree Filter Coffee Blend (500g)",
         "price": 420.0
       },
-      "base_basket_value": 999.0,
-      "upsold_basket_value": 1419.0,
-      "absolute_lift": 420.0,
-      "percentage_lift": 42.04,
+      "base_basket_inr": 999.0,
+      "gross_basket_inr": 1419.0,
+      "headroom_used_inr": 420.0,
+      "headroom_saved_inr": 381.0,
+      "transaction_lift_percentage": 42.04,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     },
     {
       "session_id": 10,
       "query": "cast iron dosa tawa",
-      "budget": 1600.0,
+      "budget_ceiling_inr": 1600.0,
       "base_product": {
         "id": "HK006",
         "name": "Pre-Seasoned Cast Iron Dosa Tawa & Skillet (10-inch)",
         "price": 1499.0
       },
-      "addon": null,
-      "base_basket_value": 1499.0,
-      "upsold_basket_value": 1499.0,
-      "absolute_lift": 0.0,
-      "percentage_lift": 0.0,
+      "accepted_addon": null,
+      "base_basket_inr": 1499.0,
+      "gross_basket_inr": 1499.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 101.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 11,
+      "query": "traditional manapparai murukku snack",
+      "budget_ceiling_inr": 500.0,
+      "base_product": {
+        "id": "FD011",
+        "name": "Manapparai Crispy Garlic Butter Murukku (250g)",
+        "price": 149.0
+      },
+      "accepted_addon": {
+        "product_id": "FD005",
+        "name": "Authentic Tirunelveli Ghee Wheat Halwa (250g)",
+        "price": 220.0
+      },
+      "base_basket_inr": 149.0,
+      "gross_basket_inr": 369.0,
+      "headroom_used_inr": 220.0,
+      "headroom_saved_inr": 131.0,
+      "transaction_lift_percentage": 147.65,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 12,
+      "query": "pure marthandam wild honey",
+      "budget_ceiling_inr": 800.0,
+      "base_product": {
+        "id": "FD008",
+        "name": "Marthandam Wild Forest Organic Honey (500g)",
+        "price": 499.0
+      },
+      "accepted_addon": {
+        "product_id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "base_basket_inr": 499.0,
+      "gross_basket_inr": 798.0,
+      "headroom_used_inr": 299.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 59.92,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 13,
+      "query": "gingelly sesame oil for cooking",
+      "budget_ceiling_inr": 1000.0,
+      "base_product": {
+        "id": "FD016",
+        "name": "Erode Wood-Pressed Gingelly Sesame Oil (500ml)",
+        "price": 280.0
+      },
+      "accepted_addon": {
+        "product_id": "FD021",
+        "name": "Madurai Traditional Spicy Idli Milagai Podi (250g)",
+        "price": 149.0
+      },
+      "base_basket_inr": 280.0,
+      "gross_basket_inr": 429.0,
+      "headroom_used_inr": 149.0,
+      "headroom_saved_inr": 571.0,
+      "transaction_lift_percentage": 53.21,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 14,
+      "query": "heritage karuppu kavuni black rice",
+      "budget_ceiling_inr": 900.0,
+      "base_product": {
+        "id": "FD012",
+        "name": "Chettinad Heritage Karuppu Kavuni Black Rice (1kg)",
+        "price": 240.0
+      },
+      "accepted_addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_inr": 240.0,
+      "gross_basket_inr": 639.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 261.0,
+      "transaction_lift_percentage": 166.25,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 15,
+      "query": "madurai spicy idli milagai podi",
+      "budget_ceiling_inr": 500.0,
+      "base_product": {
+        "id": "FD021",
+        "name": "Madurai Traditional Spicy Idli Milagai Podi (250g)",
+        "price": 149.0
+      },
+      "accepted_addon": {
+        "product_id": "FD016",
+        "name": "Erode Wood-Pressed Gingelly Sesame Oil (500ml)",
+        "price": 280.0
+      },
+      "base_basket_inr": 149.0,
+      "gross_basket_inr": 429.0,
+      "headroom_used_inr": 280.0,
+      "headroom_saved_inr": 71.0,
+      "transaction_lift_percentage": 187.92,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 16,
+      "query": "organic finger millet ragi flour",
+      "budget_ceiling_inr": 400.0,
+      "base_product": {
+        "id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "accepted_addon": null,
+      "base_basket_inr": 299.0,
+      "gross_basket_inr": 299.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 101.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 17,
+      "query": "usb-c multiport hub adapter",
+      "budget_ceiling_inr": 2500.0,
+      "base_product": {
+        "id": "EL003",
+        "name": "7-in-1 Aluminium USB-C Multiport Hub",
+        "price": 1899.0
+      },
+      "accepted_addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_inr": 1899.0,
+      "gross_basket_inr": 2298.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 202.0,
+      "transaction_lift_percentage": 21.01,
+      "policy_gate": "HOSTED_CHECKOUT",
+      "within_budget": true
+    },
+    {
+      "session_id": 18,
+      "query": "fast charging 65w gan wall charger",
+      "budget_ceiling_inr": 2200.0,
+      "base_product": {
+        "id": "EL009",
+        "name": "65W GaN Dual Port Fast Wall Charger",
+        "price": 1499.0
+      },
+      "accepted_addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_inr": 1499.0,
+      "gross_basket_inr": 1898.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 302.0,
+      "transaction_lift_percentage": 26.62,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 19,
+      "query": "ergonomic laptop stand aluminium",
+      "budget_ceiling_inr": 1800.0,
+      "base_product": {
+        "id": "EL010",
+        "name": "Ergonomic Aluminum Laptop Cooling Stand",
+        "price": 999.0
+      },
+      "accepted_addon": {
+        "product_id": "EL005",
+        "name": "Fast Qi Wireless Charging Pad (15W)",
+        "price": 799.0
+      },
+      "base_basket_inr": 999.0,
+      "gross_basket_inr": 1798.0,
+      "headroom_used_inr": 799.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 79.98,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 20,
+      "query": "desk pad non-slip mat",
+      "budget_ceiling_inr": 900.0,
+      "base_product": {
+        "id": "EL005",
+        "name": "Fast Qi Wireless Charging Pad (15W)",
+        "price": 799.0
+      },
+      "accepted_addon": {
+        "product_id": "FD009",
+        "name": "Tuticorin Sun-Dried Natural Crystal Sea Salt (1kg)",
+        "price": 99.0
+      },
+      "base_basket_inr": 799.0,
+      "gross_basket_inr": 898.0,
+      "headroom_used_inr": 99.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 12.39,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 21,
+      "query": "spicy mixture savory snack",
+      "budget_ceiling_inr": 400.0,
+      "base_product": {
+        "id": "FD024",
+        "name": "Karaikudi Chettinad Spicy Mixture & Seeval (200g)",
+        "price": 159.0
+      },
+      "accepted_addon": {
+        "product_id": "FD003",
+        "name": "Kovilpatti Special Kadalai Mittai (400g)",
+        "price": 199.0
+      },
+      "base_basket_inr": 159.0,
+      "gross_basket_inr": 358.0,
+      "headroom_used_inr": 199.0,
+      "headroom_saved_inr": 42.0,
+      "transaction_lift_percentage": 125.16,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 22,
+      "query": "tirunelveli ghee wheat halwa",
+      "budget_ceiling_inr": 700.0,
+      "base_product": {
+        "id": "FD005",
+        "name": "Authentic Tirunelveli Ghee Wheat Halwa (250g)",
+        "price": 220.0
+      },
+      "accepted_addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_inr": 220.0,
+      "gross_basket_inr": 619.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 81.0,
+      "transaction_lift_percentage": 181.36,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 23,
+      "query": "srivilliputhur milk palkova sweet",
+      "budget_ceiling_inr": 650.0,
+      "base_product": {
+        "id": "FD015",
+        "name": "Srivilliputhur Traditional Ghee Palkova (250g)",
+        "price": 210.0
+      },
+      "accepted_addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_inr": 210.0,
+      "gross_basket_inr": 609.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 41.0,
+      "transaction_lift_percentage": 190.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 24,
+      "query": "crispy nendran banana chips in coconut oil",
+      "budget_ceiling_inr": 500.0,
+      "base_product": {
+        "id": "FD020",
+        "name": "Nagercoil Crispy Nendran Banana Chips (200g)",
+        "price": 160.0
+      },
+      "accepted_addon": {
+        "product_id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "base_basket_inr": 160.0,
+      "gross_basket_inr": 459.0,
+      "headroom_used_inr": 299.0,
+      "headroom_saved_inr": 41.0,
+      "transaction_lift_percentage": 186.88,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 25,
+      "query": "kovilpatti peanut kadalai mittai",
+      "budget_ceiling_inr": 400.0,
+      "base_product": {
+        "id": "FD003",
+        "name": "Kovilpatti Special Kadalai Mittai (400g)",
+        "price": 199.0
+      },
+      "accepted_addon": {
+        "product_id": "FD009",
+        "name": "Tuticorin Sun-Dried Natural Crystal Sea Salt (1kg)",
+        "price": 99.0
+      },
+      "base_basket_inr": 199.0,
+      "gross_basket_inr": 298.0,
+      "headroom_used_inr": 99.0,
+      "headroom_saved_inr": 102.0,
+      "transaction_lift_percentage": 49.75,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 26,
+      "query": "premium roasted filter coffee beans",
+      "budget_ceiling_inr": 900.0,
+      "base_product": {
+        "id": "FD007",
+        "name": "Kumbakonam Degree Filter Coffee Blend (500g)",
+        "price": 420.0
+      },
+      "accepted_addon": {
+        "product_id": "FD003",
+        "name": "Kovilpatti Special Kadalai Mittai (400g)",
+        "price": 199.0
+      },
+      "base_basket_inr": 420.0,
+      "gross_basket_inr": 619.0,
+      "headroom_used_inr": 199.0,
+      "headroom_saved_inr": 281.0,
+      "transaction_lift_percentage": 47.38,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 27,
+      "query": "nilgiri orthodox black tea leaves",
+      "budget_ceiling_inr": 750.0,
+      "base_product": {
+        "id": "FD014",
+        "name": "Nilgiri Orthodox Whole Leaf Golden Black Tea (250g)",
+        "price": 299.0
+      },
+      "accepted_addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_inr": 299.0,
+      "gross_basket_inr": 698.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 52.0,
+      "transaction_lift_percentage": 133.44,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 28,
+      "query": "organic moringa leaf powder",
+      "budget_ceiling_inr": 550.0,
+      "base_product": {
+        "id": "FD023",
+        "name": "Madurai Organic Moringa Leaf Herbal Infusion (50 Bags)",
+        "price": 260.0
+      },
+      "accepted_addon": {
+        "product_id": "FD003",
+        "name": "Kovilpatti Special Kadalai Mittai (400g)",
+        "price": 199.0
+      },
+      "base_basket_inr": 260.0,
+      "gross_basket_inr": 459.0,
+      "headroom_used_inr": 199.0,
+      "headroom_saved_inr": 91.0,
+      "transaction_lift_percentage": 76.54,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 29,
+      "query": "spicy mango thokku home pickle",
+      "budget_ceiling_inr": 450.0,
+      "base_product": {
+        "id": "FD017",
+        "name": "Salem Malgova Mango Thokku Pickle (350g)",
+        "price": 189.0
+      },
+      "accepted_addon": {
+        "product_id": "FD003",
+        "name": "Kovilpatti Special Kadalai Mittai (400g)",
+        "price": 199.0
+      },
+      "base_basket_inr": 189.0,
+      "gross_basket_inr": 388.0,
+      "headroom_used_inr": 199.0,
+      "headroom_saved_inr": 62.0,
+      "transaction_lift_percentage": 105.29,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 30,
+      "query": "brass traditional filter coffee maker davarah",
+      "budget_ceiling_inr": 1500.0,
+      "base_product": {
+        "id": "HK007",
+        "name": "Electric Handheld Milk Frother",
+        "price": 599.0
+      },
+      "accepted_addon": {
+        "product_id": "EL001",
+        "name": "Ergonomic Wireless Optical Mouse",
+        "price": 899.0
+      },
+      "base_basket_inr": 599.0,
+      "gross_basket_inr": 1498.0,
+      "headroom_used_inr": 899.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 150.08,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 31,
+      "query": "tri-ply stainless steel frying pan",
+      "budget_ceiling_inr": 2200.0,
+      "base_product": {
+        "id": "HK002",
+        "name": "Salem Stainless Steel Water Bottle (1L)",
+        "price": 899.0
+      },
+      "accepted_addon": {
+        "product_id": "HK001",
+        "name": "Ceramic Coffee Mug (350ml)",
+        "price": 499.0
+      },
+      "base_basket_inr": 899.0,
+      "gross_basket_inr": 1398.0,
+      "headroom_used_inr": 499.0,
+      "headroom_saved_inr": 802.0,
+      "transaction_lift_percentage": 55.51,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 33,
+      "query": "borosilicate glass food storage containers",
+      "budget_ceiling_inr": 1400.0,
+      "base_product": {
+        "id": "HK003",
+        "name": "Rapid Boil Electric Glass Kettle (1.8L)",
+        "price": 1199.0
+      },
+      "accepted_addon": {
+        "product_id": "FD003",
+        "name": "Kovilpatti Special Kadalai Mittai (400g)",
+        "price": 199.0
+      },
+      "base_basket_inr": 1199.0,
+      "gross_basket_inr": 1398.0,
+      "headroom_used_inr": 199.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 16.6,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 34,
+      "query": "linen casual spread collar shirt",
+      "budget_ceiling_inr": 1800.0,
+      "base_product": {
+        "id": "AP001",
+        "name": "Tiruppur Organic Cotton Crew T-Shirt",
+        "price": 799.0
+      },
+      "accepted_addon": {
+        "product_id": "HK002",
+        "name": "Salem Stainless Steel Water Bottle (1L)",
+        "price": 899.0
+      },
+      "base_basket_inr": 799.0,
+      "gross_basket_inr": 1698.0,
+      "headroom_used_inr": 899.0,
+      "headroom_saved_inr": 102.0,
+      "transaction_lift_percentage": 112.52,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 35,
+      "query": "oversized heavyweight streetwear t-shirt",
+      "budget_ceiling_inr": 1200.0,
+      "base_product": {
+        "id": "AP001",
+        "name": "Tiruppur Organic Cotton Crew T-Shirt",
+        "price": 799.0
+      },
+      "accepted_addon": null,
+      "base_basket_inr": 799.0,
+      "gross_basket_inr": 799.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 401.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 36,
+      "query": "wireless noise cancelling headphones",
+      "budget_ceiling_inr": 3000.0,
+      "base_product": {
+        "id": "EL002",
+        "name": "Active Noise Cancelling Wireless Headphones",
+        "price": 2499.0
+      },
+      "accepted_addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_inr": 2499.0,
+      "gross_basket_inr": 2898.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 102.0,
+      "transaction_lift_percentage": 15.97,
+      "policy_gate": "HOSTED_CHECKOUT",
+      "within_budget": true
+    },
+    {
+      "session_id": 37,
+      "query": "magnetic wireless power bank 10000mah",
+      "budget_ceiling_inr": 2000.0,
+      "base_product": {
+        "id": "EL001",
+        "name": "Ergonomic Wireless Optical Mouse",
+        "price": 899.0
+      },
+      "accepted_addon": {
+        "product_id": "EL005",
+        "name": "Fast Qi Wireless Charging Pad (15W)",
+        "price": 799.0
+      },
+      "base_basket_inr": 899.0,
+      "gross_basket_inr": 1698.0,
+      "headroom_used_inr": 799.0,
+      "headroom_saved_inr": 302.0,
+      "transaction_lift_percentage": 88.88,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 38,
+      "query": "braided durable usb-c cable 2m",
+      "budget_ceiling_inr": 700.0,
+      "base_product": {
+        "id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "accepted_addon": {
+        "product_id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "base_basket_inr": 399.0,
+      "gross_basket_inr": 698.0,
+      "headroom_used_inr": 299.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 74.94,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 39,
+      "query": "webcam full hd with dual microphone",
+      "budget_ceiling_inr": 2200.0,
+      "base_product": {
+        "id": "EL004",
+        "name": "1080p Full HD Pro Streaming Webcam",
+        "price": 1999.0
+      },
+      "accepted_addon": {
+        "product_id": "FD003",
+        "name": "Kovilpatti Special Kadalai Mittai (400g)",
+        "price": 199.0
+      },
+      "base_basket_inr": 1999.0,
+      "gross_basket_inr": 2198.0,
+      "headroom_used_inr": 199.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 9.95,
+      "policy_gate": "HOSTED_CHECKOUT",
+      "within_budget": true
+    },
+    {
+      "session_id": 40,
+      "query": "mechanical switches keyboard compact",
+      "budget_ceiling_inr": 1900.0,
+      "base_product": {
+        "id": "KB001",
+        "name": "Mechanical Gaming Keyboard",
+        "price": 1499.0
+      },
+      "accepted_addon": null,
+      "base_basket_inr": 1499.0,
+      "gross_basket_inr": 1499.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 401.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 41,
+      "query": "healthy traditional sathu maavu porridge",
+      "budget_ceiling_inr": 600.0,
+      "base_product": {
+        "id": "FD010",
+        "name": "Traditional Sathu Maavu Millet Health Mix (500g)",
+        "price": 299.0
+      },
+      "accepted_addon": {
+        "product_id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "base_basket_inr": 299.0,
+      "gross_basket_inr": 598.0,
+      "headroom_used_inr": 299.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 100.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 42,
+      "query": "organic little millet samai rice",
+      "budget_ceiling_inr": 500.0,
+      "base_product": {
+        "id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "accepted_addon": null,
+      "base_basket_inr": 299.0,
+      "gross_basket_inr": 299.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 201.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "AUTO_APPROVED",
+      "within_budget": true
+    },
+    {
+      "session_id": 43,
+      "query": "tuticorin crispy cashew macaroons",
+      "budget_ceiling_inr": 650.0,
+      "base_product": {
+        "id": "FD025",
+        "name": "Thoothukudi Authentic Cashew Macaroons (250g)",
+        "price": 279.0
+      },
+      "accepted_addon": {
+        "product_id": "FD001",
+        "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
+        "price": 349.0
+      },
+      "base_basket_inr": 279.0,
+      "gross_basket_inr": 628.0,
+      "headroom_used_inr": 349.0,
+      "headroom_saved_inr": 22.0,
+      "transaction_lift_percentage": 125.09,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 44,
+      "query": "pure palm jaggery panankarkandu",
+      "budget_ceiling_inr": 600.0,
+      "base_product": {
+        "id": "FD003",
+        "name": "Kovilpatti Special Kadalai Mittai (400g)",
+        "price": 199.0
+      },
+      "accepted_addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_inr": 199.0,
+      "gross_basket_inr": 598.0,
+      "headroom_used_inr": 399.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 200.5,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 45,
+      "query": "cold pressed groundnut peanut oil",
+      "budget_ceiling_inr": 850.0,
+      "base_product": {
+        "id": "FD001",
+        "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
+        "price": 349.0
+      },
+      "accepted_addon": {
+        "product_id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "base_basket_inr": 349.0,
+      "gross_basket_inr": 648.0,
+      "headroom_used_inr": 299.0,
+      "headroom_saved_inr": 202.0,
+      "transaction_lift_percentage": 85.67,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 46,
+      "query": "copper water bottle hammered finish",
+      "budget_ceiling_inr": 1300.0,
+      "base_product": {
+        "id": "HK002",
+        "name": "Salem Stainless Steel Water Bottle (1L)",
+        "price": 899.0
+      },
+      "accepted_addon": null,
+      "base_basket_inr": 899.0,
+      "gross_basket_inr": 899.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 401.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 49,
+      "query": "polo collar breathable cotton piqu\u00e9 t-shirt",
+      "budget_ceiling_inr": 1100.0,
+      "base_product": {
+        "id": "AP001",
+        "name": "Tiruppur Organic Cotton Crew T-Shirt",
+        "price": 799.0
+      },
+      "accepted_addon": null,
+      "base_basket_inr": 799.0,
+      "gross_basket_inr": 799.0,
+      "headroom_used_inr": 0.0,
+      "headroom_saved_inr": 301.0,
+      "transaction_lift_percentage": 0.0,
+      "policy_gate": "REQUIRES_CONFIRMATION",
+      "within_budget": true
+    },
+    {
+      "session_id": 50,
+      "query": "mechanical keyboard for mac and windows",
+      "budget_ceiling_inr": 2000.0,
+      "base_product": {
+        "id": "KB001",
+        "name": "Mechanical Gaming Keyboard",
+        "price": 1499.0
+      },
+      "accepted_addon": {
+        "product_id": "HK001",
+        "name": "Ceramic Coffee Mug (350ml)",
+        "price": 499.0
+      },
+      "base_basket_inr": 1499.0,
+      "gross_basket_inr": 1998.0,
+      "headroom_used_inr": 499.0,
+      "headroom_saved_inr": 2.0,
+      "transaction_lift_percentage": 33.29,
+      "policy_gate": "REQUIRES_CONFIRMATION",
       "within_budget": true
     }
   ]

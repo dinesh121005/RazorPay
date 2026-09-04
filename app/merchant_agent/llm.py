@@ -44,6 +44,33 @@ Return ONLY a valid JSON object with the following schema:
 """
 
 
+ADDON_REASONING_SYSTEM_PROMPT = """
+You are the Autonomous Merchant AI Sales Growth Engine for Track 01 Agentic Commerce.
+Your goal is to maximize merchant average order value (AOV) by proposing relevant complementary add-on items, strictly constrained by the buyer's remaining budget headroom.
+
+Given:
+1. Base product details (name, category, price).
+2. Remaining budget headroom in INR (₹).
+3. The merchant's catalog database.
+
+Your task:
+1. Reason dynamically over product specifications to select 1 to 3 complementary products.
+2. Ensure the selected product price fits strictly within the remaining budget headroom.
+3. Formulate a compelling, dynamic pairing rationale explaining WHY the items pair together (e.g., barista grind pairing, desk setup ergonomics, regional culinary synergy) and note the exact headroom budget remaining after purchase.
+
+Return ONLY a valid JSON object with the following schema:
+{
+  "sales_pitch": "Persuasive sales pitch explaining the synergy and savings",
+  "recommended_addons": [
+    {
+      "product_id": "PRODUCT_ID",
+      "pairing_rationale": "Specific contextual synergy explanation based on product attributes and headroom"
+    }
+  ]
+}
+"""
+
+
 def call_llm_merchant_reasoning(
     query: str,
     catalog: List[Dict[str, Any]],
@@ -71,9 +98,9 @@ def call_llm_merchant_reasoning(
 
     try:
         if gemini_key:
-            return _call_gemini(gemini_key, user_payload)
+            return _call_gemini(gemini_key, MERCHANT_SYSTEM_PROMPT, user_payload)
         elif openai_key:
-            return _call_openai(openai_key, user_payload)
+            return _call_openai(openai_key, MERCHANT_SYSTEM_PROMPT, user_payload)
     except Exception as e:
         logger.warning(f"Merchant LLM reasoning failed, falling back to local reasoning: {e}")
         return None
@@ -81,10 +108,43 @@ def call_llm_merchant_reasoning(
     return None
 
 
-def _call_gemini(api_key: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def call_llm_addon_reasoning(
+    base_product: Dict[str, Any],
+    catalog: List[Dict[str, Any]],
+    remaining_budget: Optional[float] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Invokes real LLM reasoning (Gemini / OpenAI) to dynamically suggest complementary
+    add-ons grounded in catalog specifications and budget headroom.
+    """
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if not gemini_key and not openai_key:
+        return None
+
+    user_payload = {
+        "base_product": base_product,
+        "remaining_budget_headroom": remaining_budget,
+        "store_catalog_database": catalog,
+    }
+
+    try:
+        if gemini_key:
+            return _call_gemini(gemini_key, ADDON_REASONING_SYSTEM_PROMPT, user_payload)
+        elif openai_key:
+            return _call_openai(openai_key, ADDON_REASONING_SYSTEM_PROMPT, user_payload)
+    except Exception as e:
+        logger.warning(f"Merchant LLM add-on reasoning failed, falling back to dynamic local reasoning: {e}")
+        return None
+
+    return None
+
+
+def _call_gemini(api_key: str, system_prompt: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Calls Google Gemini API for Merchant Agent reasoning."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    prompt = f"{MERCHANT_SYSTEM_PROMPT}\n\nBuyer Request and Catalog Data:\n{json.dumps(payload, indent=2)}"
+    prompt = f"{system_prompt}\n\nContext & Catalog Data:\n{json.dumps(payload, indent=2)}"
 
     with httpx.Client(timeout=15.0) as client:
         res = client.post(
@@ -101,12 +161,12 @@ def _call_gemini(api_key: str, payload: Dict[str, Any]) -> Optional[Dict[str, An
     return None
 
 
-def _call_openai(api_key: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _call_openai(api_key: str, system_prompt: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Calls OpenAI API for Merchant Agent reasoning."""
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     messages = [
-        {"role": "system", "content": MERCHANT_SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": json.dumps(payload, indent=2)},
     ]
 
@@ -125,3 +185,4 @@ def _call_openai(api_key: str, payload: Dict[str, Any]) -> Optional[Dict[str, An
             text_content = data["choices"][0]["message"]["content"]
             return json.loads(text_content)
     return None
+

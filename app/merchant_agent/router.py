@@ -22,7 +22,14 @@ router = APIRouter(prefix="/merchant", tags=["merchant-agent"])
     summary="Agent-to-Agent (A2A) Product Procurement Inquiry",
     description="Allows a Buyer AI Agent (e.g. Claude) to query the Merchant Sales Agent with natural language requirements and receive structured product quotes."
 )
+@router.post(
+    "/inquiry",
+    response_model=InquiryResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 def inquire_merchant(request: InquiryRequest) -> InquiryResponse:
+
     """
     Handles natural language procurement requests from Buyer AI Agents and returns ranked product quotes.
     """

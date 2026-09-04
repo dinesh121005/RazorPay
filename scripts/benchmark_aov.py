@@ -131,20 +131,26 @@ def run_benchmark() -> Dict[str, Any]:
         total_baseline_value += base_price
         total_upsell_value += upsold_price
 
+        headroom_used = round(upsold_price - base_price, 2)
+        headroom_saved = round(budget - upsold_price, 2)
+        policy_gate = "AUTO_APPROVED" if upsold_price < 500 else ("REQUIRES_CONFIRMATION" if upsold_price <= 2000 else "HOSTED_CHECKOUT")
+
         results.append({
             "session_id": idx,
             "query": query,
-            "budget": budget,
+            "budget_ceiling_inr": budget,
             "base_product": {
                 "id": base_quote.product_id,
                 "name": base_quote.name,
                 "price": base_price,
             },
-            "addon": addon_added,
-            "base_basket_value": base_price,
-            "upsold_basket_value": upsold_price,
-            "absolute_lift": round(upsold_price - base_price, 2),
-            "percentage_lift": pct_lift,
+            "accepted_addon": addon_added,
+            "base_basket_inr": base_price,
+            "gross_basket_inr": upsold_price,
+            "headroom_used_inr": headroom_used,
+            "headroom_saved_inr": headroom_saved,
+            "transaction_lift_percentage": pct_lift,
+            "policy_gate": policy_gate,
             "within_budget": upsold_price <= budget,
         })
 
@@ -159,7 +165,8 @@ def run_benchmark() -> Dict[str, Any]:
             "total_synthetic_sessions": len(SYNTHETIC_SESSIONS),
             "evaluated_sessions": num_evaluated,
             "target_track": "Track 01: AI Growth & Transactable Merchants",
-            "model_tested": "MerchantAgentService with Cross-Sell Affinity & Budget Headroom Guardrails",
+            "model_tested": "MerchantAgentService with Dynamic Headroom & Cross-Sell Growth Engine",
+            "data_transparency_note": "Transparent per-transaction telemetry: baseline basket, accepted add-on, budget headroom saved/used, and AOV attribution.",
         },
         "empirical_metrics": {
             "average_baseline_aov_inr": avg_base_aov,
@@ -169,7 +176,7 @@ def run_benchmark() -> Dict[str, Any]:
             "budget_compliance_rate_percentage": 100.0 if budget_violations == 0 else round((1 - budget_violations/num_evaluated)*100, 2),
             "zero_budget_violations_guarantee": budget_violations == 0,
         },
-        "sample_sessions": results[:10],
+        "per_transaction_telemetry": results,
     }
 
     # Save to benchmarks directory
@@ -182,16 +189,34 @@ def run_benchmark() -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     summary = run_benchmark()
     m = summary["empirical_metrics"]
-    print("=" * 70)
-    print("[+] TRACK 01 EMPIRICAL REVENUE GROWTH & AOV LIFT BENCHMARK")
-    print("=" * 70)
+    print("=" * 95)
+    print(" TRACK 01 EMPIRICAL REVENUE GROWTH & PER-TRANSACTION TELEMETRY")
+    print("=" * 95)
     print(f"Total Evaluated Sessions:       {summary['benchmark_metadata']['evaluated_sessions']}")
     print(f"Baseline Average Basket (AOV):  Rs. {m['average_baseline_aov_inr']:.2f}")
     print(f"AI-Upsold Average Basket (AOV): Rs. {m['average_upsold_aov_inr']:.2f}")
     print(f"Empirical AOV Uplift:           +{m['net_aov_lift_percentage']}%")
     print(f"Add-On Attach Rate:             {m['successful_addon_attach_rate_percentage']}%")
     print(f"Budget Guardrail Compliance:    {m['budget_compliance_rate_percentage']}% (Zero Violations: {m['zero_budget_violations_guarantee']})")
-    print("=" * 70)
-    print("Saved empirical dataset to benchmarks/aov_benchmark_results.json")
+    print("=" * 95)
+    print("\nSAMPLE PER-TRANSACTION TELEMETRY & GROWTH ATTRIBUTION:")
+    print(f"{'#':<3} {'Base Product':<28} {'Base':<7} {'AI Add-on':<22} {'Addon':<7} {'Basket':<8} {'Saved':<7} {'Lift %':<8} {'Policy Gate'}")
+    print("-" * 110)
+    for r in summary["per_transaction_telemetry"][:12]:
+        b_name = r['base_product']['name'][:26]
+        b_price = f"Rs.{r['base_basket_inr']:.0f}"
+        a_name = (r['accepted_addon']['name'][:20] if r['accepted_addon'] else "None")
+        a_price = f"Rs.{r['accepted_addon']['price']:.0f}" if r['accepted_addon'] else "-"
+        gross = f"Rs.{r['gross_basket_inr']:.0f}"
+        saved = f"Rs.{r['headroom_saved_inr']:.0f}"
+        lift = f"+{r['transaction_lift_percentage']:.1f}%"
+        gate = r['policy_gate']
+        print(f"{r['session_id']:<3} {b_name:<28} {b_price:<7} {a_name:<22} {a_price:<7} {gross:<8} {saved:<7} {lift:<8} {gate}")
+    print("-" * 110)
+    print(f"Full transparent telemetry saved to {Path('benchmarks/aov_benchmark_results.json')}")
+

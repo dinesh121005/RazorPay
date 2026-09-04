@@ -127,3 +127,21 @@ def health_check() -> dict:
         "service": "gateway",
         "version": "1.0.0"
     }
+
+
+@app.get("/api/analytics/growth-benchmark", tags=["analytics"], summary="Track 01 Empirical Growth Telemetry")
+def get_growth_benchmark() -> dict:
+    """
+    Returns transparent empirical AOV uplift metrics and per-transaction telemetry for Track 01.
+    """
+    import json
+    benchmark_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "benchmarks", "aov_benchmark_results.json")
+    if os.path.exists(benchmark_path):
+        try:
+            with open(benchmark_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    from scripts.benchmark_aov import run_benchmark
+    return run_benchmark()
+

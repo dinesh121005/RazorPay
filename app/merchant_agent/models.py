@@ -58,4 +58,7 @@ class AddOnRecommendationResponse(BaseModel):
     addons: List[ProductQuote] = Field(default_factory=list, description="Complementary add-on items that fit within headroom")
     merchant_pitch: str = Field(..., description="Merchant sales pitch explaining the value add")
     total_addons: int = Field(..., description="Count of recommended add-on items")
+    llm_reasoning_used: bool = Field(default=False, description="Whether live LLM reasoning (Gemini/OpenAI) generated these add-ons")
+    llm_engine: Optional[str] = Field(default="Dynamic Headroom & Synergy Reasoning", description="Active AI reasoning engine label")
+
 

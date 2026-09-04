@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 from app.catalog.data import PRODUCTS
 from app.catalog.models import Product
-from app.merchant_agent.llm import call_llm_merchant_reasoning
+from app.merchant_agent.llm import (
+    call_llm_addon_reasoning,
+    call_llm_merchant_reasoning,
+)
+
 from app.merchant_agent.models import (
     AddOnRecommendationResponse,
     InquiryRequest,
@@ -235,15 +239,74 @@ class MerchantAgentService:
         """
         Track 01 Revenue Growth Engine: Formulates intelligent cross-sell and add-on
         recommendations to increase merchant order basket value within mandate headroom.
+        Grounded strictly in catalog pricing and inventory.
         """
         clean_pid = product_id.strip()
         catalog_by_id = {p.id: p for p in PRODUCTS}
         base_product = catalog_by_id.get(clean_pid)
 
-        # Determine complementary target product IDs
+        # 1. Attempt dynamic LLM-based add-on reasoning if an AI key is present
+        if base_product:
+            catalog_dict = [p.model_dump() for p in PRODUCTS]
+            llm_result = call_llm_addon_reasoning(
+                base_product=base_product.model_dump(),
+                catalog=catalog_dict,
+                remaining_budget=remaining_budget,
+            )
+            if llm_result and "recommended_addons" in llm_result:
+                try:
+                    validated_addons: List[ProductQuote] = []
+                    for item in llm_result.get("recommended_addons", []):
+                        pid = item.get("product_id")
+                        if not pid or pid not in catalog_by_id:
+                            continue
+                        cand = catalog_by_id[pid]
+                        if cand.stock < 1:
+                            continue
+                        within_budget = True if remaining_budget is None else cand.price <= remaining_budget
+                        if not within_budget:
+                            continue
+
+                        rationale = item.get("pairing_rationale") or f"Dynamic AI synergy pairing with {base_product.name}"
+                        headroom_reason = (
+                            f"Consumes ₹{cand.price:.2f} of remaining ₹{remaining_budget:.2f} headroom (preserves ₹{remaining_budget - cand.price:.2f} buffer)"
+                            if remaining_budget
+                            else "In stock for immediate dispatch"
+                        )
+                        validated_addons.append(
+                            ProductQuote(
+                                product_id=cand.id,
+                                name=cand.name,
+                                category=cand.category,
+                                price_per_unit=cand.price,
+                                total_price=cand.price,
+                                in_stock=True,
+                                stock_available=cand.stock,
+                                match_reasons=[rationale, headroom_reason],
+                                within_budget=within_budget,
+                            )
+                        )
+
+                    if validated_addons:
+                        engine_label = "Google Gemini 2.5 Flash Dynamic Add-On Reasoning" if os.getenv("GEMINI_API_KEY") else "OpenAI GPT-4o-mini Dynamic Add-On Reasoning"
+                        pitch = llm_result.get(
+                            "sales_pitch",
+                            f"Merchant AI Suggestion: Complete your setup with these dynamic add-ons paired with {base_product.name}!",
+                        )
+                        return AddOnRecommendationResponse(
+                            base_product_id=clean_pid,
+                            addons=validated_addons,
+                            merchant_pitch=pitch,
+                            total_addons=len(validated_addons),
+                            llm_reasoning_used=True,
+                            llm_engine=engine_label,
+                        )
+                except Exception as exc:
+                    logger.warning(f"Error validating LLM add-on quotes: {exc}")
+
+        # 2. Local Dynamic Headroom & Synergy Engine (Offline fallback)
         candidate_ids = CROSS_SELL_AFFINITY_MAP.get(clean_pid, [])
         if not candidate_ids:
-            # Fallback to other items in catalog
             candidate_ids = [p.id for p in PRODUCTS if p.id != clean_pid]
 
         addon_quotes: List[ProductQuote] = []
@@ -256,21 +319,28 @@ class MerchantAgentService:
             if remaining_budget is not None and not within_budget:
                 continue  # Only recommend items that fit within customer's available headroom
 
-            quote = ProductQuote(
-                product_id=cand.id,
-                name=cand.name,
-                category=cand.category,
-                price_per_unit=cand.price,
-                total_price=cand.price,
-                in_stock=True,
-                stock_available=cand.stock,
-                match_reasons=[
-                    f"Complementary add-on pairing with {base_product.name if base_product else clean_pid}",
-                    f"Fits within available budget headroom of ₹{remaining_budget:.2f}" if remaining_budget else "In stock for immediate dispatch",
-                ],
-                within_budget=within_budget,
+            headroom_note = (
+                f"Consumes ₹{cand.price:.2f} of remaining ₹{remaining_budget:.2f} headroom (preserves ₹{remaining_budget - cand.price:.2f} buffer)"
+                if remaining_budget
+                else "In stock for immediate dispatch"
             )
-            addon_quotes.append(quote)
+            base_name = base_product.name if base_product else clean_pid
+            addon_quotes.append(
+                ProductQuote(
+                    product_id=cand.id,
+                    name=cand.name,
+                    category=cand.category,
+                    price_per_unit=cand.price,
+                    total_price=cand.price,
+                    in_stock=True,
+                    stock_available=cand.stock,
+                    match_reasons=[
+                        f"Catalog synergy: Complementary {cand.category.lower()} pairing dynamically matched to {base_name}",
+                        headroom_note,
+                    ],
+                    within_budget=within_budget,
+                )
+            )
 
         pitch = (
             f"Merchant Sales Suggestion: Complete your setup with these recommended add-ons "
@@ -284,7 +354,10 @@ class MerchantAgentService:
             addons=addon_quotes,
             merchant_pitch=pitch,
             total_addons=len(addon_quotes),
+            llm_reasoning_used=False,
+            llm_engine="Dynamic Headroom & Synergy Reasoning",
         )
+
 
     def _evaluate_product_relevance(
         self,

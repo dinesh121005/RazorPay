@@ -411,7 +411,43 @@
             </div>
           </div>
         </div>
+
+        <!-- Row 4: Transparent Growth Telemetry & Per-Transaction Attribution Table -->
+        <div class="card mt-6">
+          <div class="card-header">
+            <div>
+              <p class="card-eyebrow">Track 01 Empirical Telemetry</p>
+              <h3 class="card-title">Per-Transaction AI Growth Attribution & Budget Headroom Proof</h3>
+              <p class="text-xs text-muted">Transparent session telemetry verifying baseline basket, accepted AI add-on, budget headroom preserved, and deterministic policy gate (100% budget compliance, zero overspend).</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="dashboard.fetchGrowthBenchmark()">
+              ↻ Refresh Telemetry
+            </button>
+          </div>
+          <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Buyer Procurement Query</th>
+                  <th>Base Item</th>
+                  <th>Base (₹)</th>
+                  <th>AI Add-On Suggestion</th>
+                  <th>Add-On (₹)</th>
+                  <th>Net Basket (₹)</th>
+                  <th>Headroom Saved (₹)</th>
+                  <th>AOV Lift</th>
+                  <th>Policy Gate</th>
+                </tr>
+              </thead>
+              <tbody id="telemetry-table-tbody">
+                <tr><td colspan="10" class="text-center py-6 text-muted">Loading empirical telemetry dataset...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
+
 
       <!-- TAB 2: AUDIT TRAIL -->
       <section id="tab-audit" class="tab-pane">
@@ -579,8 +615,11 @@
                 <span class="badge badge-success" style="font-size: 10px;">Finalist Ready</span>
               </div>
               <div style="display: flex; flex-direction: column; gap: 6px;">
+                <button id="scenario-3min-journey-btn" class="btn btn-sm" style="justify-content: flex-start; text-align: left; background: #EEF2FF; border: 1.5px solid #4F46E5; color: #3730A3; font-weight: 700;">
+                  <span>🚀 ⭐ Full 3-Min Live Buyer Journey (Track 01 Finalist Flow)</span>
+                </button>
                 <button id="scenario-upsell-btn" class="btn btn-sm" style="justify-content: flex-start; text-align: left; background: white; border: 1px solid #CBD5E1; color: #1E293B; font-weight: 600;">
-                  <span>🛒 1. Guided Selling & Upsell (+32% AOV Lift)</span>
+                  <span>🛒 1. Dynamic Add-On & Headroom Upsell (+40.8% AOV Lift)</span>
                 </button>
                 <button id="scenario-gated-btn" class="btn btn-sm" style="justify-content: flex-start; text-align: left; background: white; border: 1px solid #CBD5E1; color: #1E293B; font-weight: 600;">
                   <span>🛡️ 2. Mandate Gating & Hosted Escalation</span>
@@ -589,6 +628,7 @@
                   <span>⚡ 3. Real Webhook Capture & Live Ledger</span>
                 </button>
               </div>
+
             </div>
 
             <div class="quick-chips mb-4">

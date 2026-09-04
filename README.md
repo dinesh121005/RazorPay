@@ -25,18 +25,22 @@
 
 ## ⚡ Finalist 3-Minute Live Demo Sequence (Track 01 Headline)
 
-To experience the full end-to-end commercial outcome and security model in under three minutes, execute these three tightly scripted moments directly in the [Admin Dashboard Sandbox](https://razorpay-c454.onrender.com/admin/dashboard) (or via Claude Desktop / Remote MCP):
+To experience the full end-to-end commercial outcome and security model in under three minutes, run the automated CLI demo or execute it directly in the [Admin Dashboard Sandbox](https://razorpay-c454.onrender.com/admin/dashboard) (or via Claude Desktop / Remote MCP):
 
-1. **Moment 1 — Grounded Upsell (+40.8% Simulated AOV Uplift)**:
-   - Buyer AI inquires for a coding keyboard under ₹2,000.
-   - Merchant Sales AI (Gemini 2.5 Flash grounded in private catalog) quotes `KB001` (Mechanical Gaming Keyboard @ ₹1,499) and recommends a complementary add-on (`HK001` - Ceramic Coffee Desk Mug @ ₹299).
-   - Buyer AI accepts the bundle within headroom, expanding order value from ₹1,499 to **₹1,798 (+40.8% simulated basket lift)** while strictly obeying the user's spending limit.
-2. **Moment 2 — Blocked Overspend & Hosted Checkout Escalation**:
-   - Buyer AI attempts to buy `MN001` (4K Monitor @ ₹4,999, exceeding the ₹2,000 allowance).
-   - The Policy Engine deterministically blocks unilateral auto-debit, cryptographically records the attempt in the SHA-256 audit ledger, and gracefully generates a tamper-proof **Razorpay Hosted Checkout Link & dynamic UPI QR Code** (`/checkout`).
-3. **Moment 3 — Authoritative Payment Verification & Deliberate Tamper Check**:
-   - Customer completes payment via hosted checkout $\rightarrow$ gateway validates HMAC-SHA256 signature on real Razorpay rails $\rightarrow$ ledger status transitions to `CAPTURED & PAID`.
-   - **Deliberate Tamper Demonstration**: Triggering an out-of-band edit to either the event log or projection view triggers an instant `422 Tamper Alert` via `GET /audit/verify`, proving mathematical non-repudiation.
+```bash
+# Execute the complete 3-minute journey in under 60 seconds:
+python scripts/demo_3min_buyer_journey.py
+```
+
+### The 5-Step Live Journey:
+1. **Step 1 — Natural Language Procurement**: Buyer AI searches for a barista-grade French press coffee maker (budget ₹1,500). Merchant Sales AI (`POST /merchant/inquire`) matches `HK005` (French Press, ₹999) with grounded catalog specs.
+2. **Step 2 — Dynamic Headroom Add-On Reasoning**: Merchant Growth AI (`POST /merchant/recommend-addons`) reasons over catalog synergy and remaining budget headroom (₹501). Recommends `FD007` (Kumbakonam Filter Coffee, ₹420) with exact headroom preservation (₹81 buffer saved, **+42.0% AOV Lift**).
+3. **Step 3 — Deterministic Mandate Policy Gate**: Buyer AI proposes purchase (`POST /agent/purchase`) authenticated via OAuth 2.1 token. Policy engine evaluates spending limits deterministically (auto-debit for approved micro-spend vs. single-use JWT human confirmation).
+4. **Step 4 — Honest Payment Execution & Escalation**:
+   - **Autonomous Micro-Spend**: Settled via customer simulated mandate balance (honest sandbox settlement).
+   - **Out-of-Mandate Escalation**: High-value purchase (e.g. 4K Monitor @ ₹4,999) exceeding mandate cap escalates to real **Razorpay Test-Mode Hosted Checkout** (`order_*`) with live checkout link and QR code.
+5. **Step 5 — Cryptographic Dual-Layer Audit Verification**: `GET /audit/verify` traverses the SHA-256 event chain and reconciles the projection view with zero tampering.
+
 
 ---
 

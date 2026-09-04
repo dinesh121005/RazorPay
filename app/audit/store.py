@@ -162,7 +162,42 @@ class AuditStore:
                 );
                 """
             )
+
+            # Auto-migrate/backfill legacy audit_records into append-only audit_events if needed
+            cursor.execute(
+                """
+                SELECT transaction_id, timestamp, customer_id, product_id, merchant_id,
+                       quantity, amount, decision, decision_reason, payment_status, idempotency_key
+                FROM audit_records
+                WHERE transaction_id NOT IN (SELECT DISTINCT transaction_id FROM audit_events)
+                ORDER BY timestamp ASC;
+                """
+            )
+            legacy_rows = cursor.fetchall()
+            for l_row in legacy_rows:
+                tx_id, ts, cust_id, prod_id, merch_id, qty, amt, dec, dec_re, p_st, idemp = l_row
+                payload = {
+                    "customer_id": cust_id,
+                    "product_id": prod_id,
+                    "merchant_id": merch_id,
+                    "quantity": qty,
+                    "amount": amt,
+                    "decision": dec,
+                    "decision_reason": dec_re,
+                    "payment_status": p_st,
+                    "idempotency_key": idemp,
+                }
+                rec_h, _ = self._append_event(
+                    cursor,
+                    transaction_id=tx_id,
+                    event_type="PROPOSAL_EVALUATED",
+                    payload_dict=payload,
+                    timestamp=ts or datetime.now(timezone.utc).isoformat(),
+                )
+                cursor.execute("UPDATE audit_records SET record_hash = ? WHERE transaction_id = ?;", (rec_h, tx_id))
+
             conn.commit()
+
 
     def _get_latest_event_hash(self, cursor: Any) -> str:
         """Retrieves the event_hash of the most recently appended audit event, or 'GENESIS'."""
