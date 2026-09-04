@@ -449,3 +449,146 @@ def test_oauth_refresh_token_invalid_or_expired_rejected_generically():
     assert "Invalid, expired, or revoked refresh token" in res2.json()["detail"]
 
 
+def test_oauth_metadata_discovery_advertises_pkce_s256():
+    """
+    Discovery metadata endpoints must advertise PKCE S256 and public client ('none') auth.
+    Required by ChatGPT connector discovery.
+    """
+    # RFC 8414 Authorization Server Metadata
+    res1 = client.get("/.well-known/oauth-authorization-server")
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert "S256" in data1.get("code_challenge_methods_supported", [])
+    assert "none" in data1.get("token_endpoint_auth_methods_supported", [])
+    assert "authorization_code" in data1.get("grant_types_supported", [])
+
+    # OpenID Configuration alias
+    res2 = client.get("/.well-known/openid-configuration")
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert "S256" in data2.get("code_challenge_methods_supported", [])
+    assert "none" in data2.get("token_endpoint_auth_methods_supported", [])
+
+
+def test_oauth_pkce_s256_full_flow_success():
+    """
+    Full end-to-end OAuth 2.1 PKCE (RFC 7636) flow:
+    1. Client generates code_verifier and computes S256 code_challenge.
+    2. Authorizes via /oauth/authorize with challenge and client_id='chatgpt'.
+    3. Exchanges code + verifier at /oauth/token without client_secret (public client).
+    4. Validates JWT access token issued.
+    """
+    import base64
+    import hashlib
+    import secrets
+
+    # 1. Generate RFC 7636 PKCE code_verifier and code_challenge (S256)
+    code_verifier = secrets.token_urlsafe(40)  # > 43 chars
+    hashed = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    code_challenge = base64.urlsafe_b64encode(hashed).decode("ascii").rstrip("=")
+
+    # 2. Authorize
+    auth_res = client.post("/oauth/authorize", json={
+        "username": "dinesh",
+        "password": "password123",
+        "client_id": "chatgpt",
+        "redirect_uri": "https://chatgpt.com/api/aip/v1/auth/oauth/callback",
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+        "state": "chatgpt-session-42",
+    }, headers={"Accept": "application/json"})
+    assert auth_res.status_code == 200
+    code = auth_res.json()["code"]
+    assert code is not None
+
+    # 3. Exchange code for access token using code_verifier (no client_secret needed for PKCE public client)
+    token_res = client.post("/oauth/token", data={
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": "chatgpt",
+        "redirect_uri": "https://chatgpt.com/api/aip/v1/auth/oauth/callback",
+        "code_verifier": code_verifier,
+    })
+    assert token_res.status_code == 200
+    token_data = token_res.json()
+    assert token_data["token_type"] == "Bearer"
+    assert token_data["expires_in"] == 3600
+    assert "access_token" in token_data
+    assert "refresh_token" in token_data
+
+    # 4. Verify identity bound to token
+    payload = verify_access_token(token_data["access_token"])
+    assert payload["sub"] == "CUST001"
+
+
+def test_oauth_pkce_s256_invalid_verifier_rejected():
+    """
+    RFC 7636: Providing an incorrect code_verifier must fail the token exchange.
+    """
+    import base64
+    import hashlib
+    import secrets
+
+    code_verifier = secrets.token_urlsafe(40)
+    hashed = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    code_challenge = base64.urlsafe_b64encode(hashed).decode("ascii").rstrip("=")
+
+    auth_res = client.post("/oauth/authorize", json={
+        "username": "dinesh",
+        "password": "password123",
+        "client_id": "chatgpt",
+        "redirect_uri": "https://chatgpt.com/api/aip/v1/auth/oauth/callback",
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+    }, headers={"Accept": "application/json"})
+    assert auth_res.status_code == 200
+    code = auth_res.json()["code"]
+
+    # Exchange with incorrect code_verifier
+    token_res = client.post("/oauth/token", data={
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": "chatgpt",
+        "redirect_uri": "https://chatgpt.com/api/aip/v1/auth/oauth/callback",
+        "code_verifier": "wrong-verifier-123456789012345678901234567890",
+    })
+    assert token_res.status_code == 400
+    assert "invalid" in token_res.json()["detail"].lower()
+
+
+def test_oauth_pkce_missing_verifier_when_challenge_present_rejected():
+    """
+    When an auth code was issued with PKCE code_challenge, attempting to exchange
+    without code_verifier (and without valid confidential client credentials) must be rejected.
+    """
+    import base64
+    import hashlib
+    import secrets
+
+    code_verifier = secrets.token_urlsafe(40)
+    hashed = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    code_challenge = base64.urlsafe_b64encode(hashed).decode("ascii").rstrip("=")
+
+    auth_res = client.post("/oauth/authorize", json={
+        "username": "dinesh",
+        "password": "password123",
+        "client_id": "chatgpt",
+        "redirect_uri": "https://chatgpt.com/api/aip/v1/auth/oauth/callback",
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+    }, headers={"Accept": "application/json"})
+    assert auth_res.status_code == 200
+    code = auth_res.json()["code"]
+
+    # Exchange without code_verifier and without secret
+    token_res = client.post("/oauth/token", data={
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": "chatgpt",
+        "redirect_uri": "https://chatgpt.com/api/aip/v1/auth/oauth/callback",
+    })
+    assert token_res.status_code == 401
+    assert "Invalid client credentials" in token_res.json()["detail"]
+
+
+

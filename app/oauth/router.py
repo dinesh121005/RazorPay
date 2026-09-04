@@ -22,6 +22,7 @@ from app.oauth.store import (
     OAUTH_CLIENT_SECRET,
     auth_code_store,
     customer_auth_store,
+    is_allowed_client_id,
     is_allowed_redirect_uri,
     provision_new_customer,
 )
@@ -33,18 +34,30 @@ def _validate_client_credentials(
     client_id: Optional[str],
     client_secret: Optional[str],
     auth_header: Optional[str] = None,
+    code_verifier: Optional[str] = None,
+    code_record: Optional[Any] = None,
 ) -> bool:
-    """Validates client_id and client_secret from body or Authorization: Basic header."""
-    # Check Basic Auth header
+    """Validates client_id and client_secret from body, Authorization: Basic header, or PKCE public client."""
+    effective_client_id = client_id or OAUTH_CLIENT_ID
+
+    # 1. Check Basic Auth header
     if auth_header and auth_header.startswith("Basic "):
         try:
             decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
             h_client_id, h_client_secret = decoded.split(":", 1)
-            return h_client_id == OAUTH_CLIENT_ID and h_client_secret == OAUTH_CLIENT_SECRET
+            return is_allowed_client_id(h_client_id) and h_client_secret == OAUTH_CLIENT_SECRET
         except Exception:
             return False
 
-    return client_id == OAUTH_CLIENT_ID and client_secret == OAUTH_CLIENT_SECRET
+    # 2. Check secret provided in body
+    if client_secret:
+        return is_allowed_client_id(effective_client_id) and client_secret == OAUTH_CLIENT_SECRET
+
+    # 3. PKCE Public Client (No client_secret required per RFC 7636 / RFC 6749)
+    if code_verifier and code_record and code_record.code_challenge:
+        return is_allowed_client_id(effective_client_id)
+
+    return False
 
 
 # -----------------------------------------------------------------------------
@@ -64,10 +77,20 @@ def get_oauth_authorization_server_metadata(request: Request) -> dict:
         "token_endpoint": f"{base_url}/oauth/token",
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code", "refresh_token"],
-        "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+        "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic", "none"],
         "scopes_supported": ["purchase"],
-        "code_challenge_methods_supported": [],
+        "code_challenge_methods_supported": ["S256"],
     }
+
+
+@router.get(
+    "/.well-known/openid-configuration",
+    summary="OpenID Connect / OAuth Discovery Metadata",
+    description="Alias discovery endpoint for clients that query openid-configuration."
+)
+def get_openid_configuration(request: Request) -> dict:
+    """Returns OAuth 2.0 Authorization Server Metadata as OpenID configuration alias."""
+    return get_oauth_authorization_server_metadata(request)
 
 
 @router.get(
@@ -101,6 +124,8 @@ def get_authorize_page(
     redirect_uri: str = Query(...),
     state: Optional[str] = Query(default=None),
     scope: Optional[str] = Query(default="purchase"),
+    code_challenge: Optional[str] = Query(default=None),
+    code_challenge_method: Optional[str] = Query(default=None),
 ):
     """Renders HTML login & sign-up form with Google SSO for customer authentication."""
     if response_type != "code":
@@ -108,7 +133,7 @@ def get_authorize_page(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported response_type. Must be 'code'."
         )
-    if client_id != OAUTH_CLIENT_ID:
+    if not is_allowed_client_id(client_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid client_id: '{client_id}'."
@@ -119,12 +144,18 @@ def get_authorize_page(
             detail=f"Unauthorized redirect_uri: '{redirect_uri}'."
         )
 
-    google_login_params = urlencode({
+    google_params_dict = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
         "state": state or "",
         "scope": scope or "purchase",
-    })
+    }
+    if code_challenge:
+        google_params_dict["code_challenge"] = code_challenge
+    if code_challenge_method:
+        google_params_dict["code_challenge_method"] = code_challenge_method
+
+    google_login_params = urlencode(google_params_dict)
     google_login_url = f"/oauth/google/login?{google_login_params}"
 
     html_content = f"""<!DOCTYPE html>
@@ -330,6 +361,8 @@ def get_authorize_page(
             <input type="hidden" name="response_type" value="{response_type}">
             <input type="hidden" name="state" value="{state or ''}">
             <input type="hidden" name="scope" value="{scope or 'purchase'}">
+            <input type="hidden" name="code_challenge" value="{code_challenge or ''}">
+            <input type="hidden" name="code_challenge_method" value="{code_challenge_method or ''}">
 
             <div class="form-group">
                 <label>Username or Email</label>
@@ -351,6 +384,8 @@ def get_authorize_page(
             <input type="hidden" name="response_type" value="{response_type}">
             <input type="hidden" name="state" value="{state or ''}">
             <input type="hidden" name="scope" value="{scope or 'purchase'}">
+            <input type="hidden" name="code_challenge" value="{code_challenge or ''}">
+            <input type="hidden" name="code_challenge_method" value="{code_challenge_method or ''}">
 
             <div class="form-group">
                 <label>Full Name</label>
@@ -429,9 +464,11 @@ def google_login(
     redirect_uri: str = Query(...),
     state: Optional[str] = Query(default=None),
     scope: Optional[str] = Query(default="purchase"),
+    code_challenge: Optional[str] = Query(default=None),
+    code_challenge_method: Optional[str] = Query(default=None),
 ):
     """Generates Google OAuth URL and redirects browser to Google Sign-In."""
-    if client_id != OAUTH_CLIENT_ID:
+    if not is_allowed_client_id(client_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid client_id."
@@ -448,6 +485,8 @@ def google_login(
         "redirect_uri": redirect_uri,
         "state": state,
         "scope": scope or "purchase",
+        "code_challenge": code_challenge,
+        "code_challenge_method": code_challenge_method,
     }
     encoded_state = base64.urlsafe_b64encode(json.dumps(state_payload).encode("utf-8")).decode("utf-8")
 
@@ -498,6 +537,8 @@ async def google_callback(
             redirect_uri = state_data["redirect_uri"]
             client_state = state_data.get("state")
             client_scope = state_data.get("scope", "purchase")
+            client_code_challenge = state_data.get("code_challenge")
+            client_code_challenge_method = state_data.get("code_challenge_method")
         except Exception as e:
             logger.error("Failed to decode Google OAuth state parameter: %s", e)
             raise HTTPException(
@@ -578,6 +619,8 @@ async def google_callback(
             client_id=client_id,
             redirect_uri=redirect_uri,
             scope=client_scope or "purchase",
+            code_challenge=client_code_challenge,
+            code_challenge_method=client_code_challenge_method,
         )
 
         query_params = {"code": auth_code}
@@ -617,12 +660,14 @@ async def post_register(
     state: Optional[str] = Form(default=None),
     scope: Optional[str] = Form(default="purchase"),
     mandate_limit: Optional[float] = Form(default=2000.0),
+    code_challenge: Optional[str] = Form(default=None),
+    code_challenge_method: Optional[str] = Form(default=None),
 ):
     """Processes self-service registration and returns redirect with authorization code."""
-    if client_id != OAUTH_CLIENT_ID:
+    if not is_allowed_client_id(client_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid client_id."
+            detail=f"Invalid client_id: '{client_id}'."
         )
     if not is_allowed_redirect_uri(redirect_uri):
         raise HTTPException(
@@ -664,6 +709,8 @@ async def post_register(
         client_id=client_id,
         redirect_uri=redirect_uri,
         scope=scope or "purchase",
+        code_challenge=code_challenge,
+        code_challenge_method=code_challenge_method,
     )
 
     query_params = {"code": code}
@@ -695,6 +742,8 @@ async def post_authorize(
     response_type: Optional[str] = Form(default="code"),
     state: Optional[str] = Form(default=None),
     scope: Optional[str] = Form(default="purchase"),
+    code_challenge: Optional[str] = Form(default=None),
+    code_challenge_method: Optional[str] = Form(default=None),
 ):
     """Processes login credentials and returns redirect with authorization code."""
     # Check if JSON payload was sent instead of Form
@@ -707,16 +756,18 @@ async def post_authorize(
         response_type = body.get("response_type", response_type)
         state = body.get("state", state)
         scope = body.get("scope", scope)
+        code_challenge = body.get("code_challenge", code_challenge)
+        code_challenge_method = body.get("code_challenge_method", code_challenge_method)
 
     if not username or not password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username and password are required."
         )
-    if client_id != OAUTH_CLIENT_ID:
+    if not is_allowed_client_id(client_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid client_id."
+            detail=f"Invalid client_id: '{client_id}'."
         )
     if not is_allowed_redirect_uri(redirect_uri):
         raise HTTPException(
@@ -737,6 +788,8 @@ async def post_authorize(
         client_id=client_id,
         redirect_uri=redirect_uri,
         scope=scope or "purchase",
+        code_challenge=code_challenge,
+        code_challenge_method=code_challenge_method,
     )
 
     query_params = {"code": code}
@@ -767,10 +820,12 @@ async def post_token(
     refresh_token: Optional[str] = Form(default=None),
     client_id: Optional[str] = Form(default=None),
     client_secret: Optional[str] = Form(default=None),
+    code_verifier: Optional[str] = Form(default=None),
     authorization: Optional[str] = Header(default=None),
 ):
     """
     Exchanges an authorization code or refresh token for a signed JWT access token bound to customer_id.
+    Supports RFC 7636 PKCE (code_verifier).
     """
     if request.headers.get("content-type", "").startswith("application/json"):
         body = await request.json()
@@ -780,14 +835,22 @@ async def post_token(
         refresh_token = body.get("refresh_token", refresh_token)
         client_id = body.get("client_id", client_id)
         client_secret = body.get("client_secret", client_secret)
+        code_verifier = body.get("code_verifier", code_verifier)
 
-    if not _validate_client_credentials(client_id, client_secret, authorization):
+    effective_client_id = client_id or OAUTH_CLIENT_ID
+    code_record = auth_code_store.get_code_record(code) if code else None
+
+    if not _validate_client_credentials(
+        client_id=effective_client_id,
+        client_secret=client_secret,
+        auth_header=authorization,
+        code_verifier=code_verifier,
+        code_record=code_record,
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid client credentials."
         )
-
-    effective_client_id = client_id or OAUTH_CLIENT_ID
 
     # 1. Authorization Code Grant
     if grant_type == "authorization_code":
@@ -801,12 +864,13 @@ async def post_token(
             code=code,
             client_id=effective_client_id,
             redirect_uri=redirect_uri,
+            code_verifier=code_verifier,
         )
 
         if not customer_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid, expired, or previously used authorization code."
+                detail="Invalid, expired, or previously used authorization code (or invalid PKCE code_verifier)."
             )
 
         access_token = create_access_token(customer_id=customer_id)

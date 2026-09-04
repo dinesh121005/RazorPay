@@ -2,8 +2,10 @@
 Store for customer credentials, short-lived authorization codes, static OAuth client config,
 and persisted refresh tokens with rotation.
 """
+import base64
 import contextlib
 import hashlib
+import hmac
 import os
 import secrets
 import sqlite3
@@ -16,6 +18,31 @@ from app.oauth.models import CustomerCredentials
 # Static OAuth Client Configuration
 OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID", "claude-desktop-client")
 OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET", "claude-demo-secret")
+
+ALLOWED_CLIENT_IDS: Set[str] = {
+    OAUTH_CLIENT_ID,
+    "claude-desktop-client",
+    "chatgpt",
+    "chatgpt-connector",
+    "chatgpt-client",
+    "openai",
+    "mcp-client",
+    "ai-agent",
+    "razorpay-mcp",
+}
+
+
+def is_allowed_client_id(client_id: Optional[str]) -> bool:
+    """Validates whether a client_id is allowed for OAuth authorization and token exchange."""
+    if not client_id:
+        return False
+    if client_id in ALLOWED_CLIENT_IDS:
+        return True
+    clean = client_id.strip().lower()
+    if clean.startswith(("chatgpt", "openai", "claude", "mcp", "razorpay")):
+        return True
+    return False
+
 
 # Google OAuth SSO Configuration
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -69,8 +96,31 @@ def _hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.strip().encode("utf-8")).hexdigest()
 
 
+def verify_pkce(
+    code_verifier: Optional[str],
+    code_challenge: Optional[str],
+    method: Optional[str] = "S256",
+) -> bool:
+    """
+    Verifies an RFC 7636 code_verifier against a code_challenge.
+    Supports S256 (default) and plain.
+    """
+    if not code_verifier or not code_challenge:
+        return False
+
+    clean_method = (method or "S256").strip().upper()
+    if clean_method == "S256":
+        hashed = hashlib.sha256(code_verifier.encode("ascii")).digest()
+        computed = base64.urlsafe_b64encode(hashed).decode("ascii").rstrip("=")
+        target = code_challenge.rstrip("=")
+        return hmac.compare_digest(computed, target)
+    elif clean_method == "PLAIN":
+        return hmac.compare_digest(code_verifier, code_challenge)
+    return False
+
+
 class AuthCodeRecord:
-    """Represents a temporary, single-use authorization code."""
+    """Represents a temporary, single-use authorization code with optional PKCE challenge."""
     def __init__(
         self,
         code: str,
@@ -79,6 +129,8 @@ class AuthCodeRecord:
         redirect_uri: str,
         expires_at: float,
         scope: str = "purchase",
+        code_challenge: Optional[str] = None,
+        code_challenge_method: Optional[str] = None,
     ):
         self.code = code
         self.customer_id = customer_id
@@ -86,15 +138,25 @@ class AuthCodeRecord:
         self.redirect_uri = redirect_uri
         self.expires_at = expires_at
         self.scope = scope
+        self.code_challenge = code_challenge
+        self.code_challenge_method = code_challenge_method
 
 
 class AuthorizationCodeStore:
-    """Manages short-lived single-use authorization codes with 5-minute TTL."""
+    """Manages short-lived single-use authorization codes with 5-minute TTL and RFC 7636 PKCE validation."""
     def __init__(self, ttl_seconds: int = 300):
         self.ttl_seconds = ttl_seconds
         self._codes: Dict[str, AuthCodeRecord] = {}
 
-    def issue_code(self, customer_id: str, client_id: str, redirect_uri: str, scope: str = "purchase") -> str:
+    def issue_code(
+        self,
+        customer_id: str,
+        client_id: str,
+        redirect_uri: str,
+        scope: str = "purchase",
+        code_challenge: Optional[str] = None,
+        code_challenge_method: Optional[str] = None,
+    ) -> str:
         code = secrets.token_urlsafe(32)
         record = AuthCodeRecord(
             code=code,
@@ -103,14 +165,27 @@ class AuthorizationCodeStore:
             redirect_uri=redirect_uri,
             expires_at=time.time() + self.ttl_seconds,
             scope=scope,
+            code_challenge=code_challenge,
+            code_challenge_method=code_challenge_method,
         )
         self._codes[code] = record
         return code
 
-    def consume_code(self, code: str, client_id: str, redirect_uri: str) -> Optional[str]:
+    def get_code_record(self, code: str) -> Optional[AuthCodeRecord]:
+        """Peeks at the code record without consuming it (useful for credential validation)."""
+        return self._codes.get(code)
+
+    def consume_code(
+        self,
+        code: str,
+        client_id: str,
+        redirect_uri: str,
+        code_verifier: Optional[str] = None,
+    ) -> Optional[str]:
         """
         Validates and burns (consumes) an authorization code.
-        Returns customer_id if valid, or None if expired/invalid/already used.
+        If the code was issued with a PKCE code_challenge, code_verifier must be verified.
+        Returns customer_id if valid, or None if expired/invalid/already used/PKCE failed.
         """
         record = self._codes.pop(code, None)
         if record is None:
@@ -123,6 +198,11 @@ class AuthorizationCodeStore:
         # Check client_id and redirect_uri binding
         if record.client_id != client_id or record.redirect_uri != redirect_uri:
             return None
+
+        # Check PKCE if code was issued with code_challenge
+        if record.code_challenge:
+            if not verify_pkce(code_verifier, record.code_challenge, record.code_challenge_method):
+                return None
 
         return record.customer_id
 
