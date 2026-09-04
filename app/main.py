@@ -32,6 +32,40 @@ app = FastAPI(
     lifespan=remote_mcp_lifespan,
 )
 
+class McpNormalizeMiddleware:
+    """
+    Normalizes /mcp requests:
+    1. Prevents 307 Temporary Redirect for /mcp without trailing slash by rewriting path to /mcp/.
+    2. Ensures Accept header includes text/event-stream so standard HTTP clients (like ChatGPT)
+       receive JSON-RPC responses without 406 Not Acceptable errors.
+    """
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            raw_path = scope.get("path", "")
+            if raw_path == "/mcp" or raw_path == "/mcp/":
+                scope = dict(scope)
+                scope["path"] = "/mcp/"
+                headers = dict(scope.get("headers", []))
+                accept = headers.get(b"accept", b"")
+                if b"text/event-stream" not in accept:
+                    new_headers = []
+                    found_accept = False
+                    for k, v in scope.get("headers", []):
+                        if k.lower() == b"accept":
+                            found_accept = True
+                            new_val = v + b", text/event-stream" if v else b"application/json, text/event-stream"
+                            new_headers.append((k, new_val))
+                        else:
+                            new_headers.append((k, v))
+                    if not found_accept:
+                        new_headers.append((b"accept", b"application/json, text/event-stream"))
+                    scope["headers"] = new_headers
+        await self.app(scope, receive, send)
+
+
 # Enable CORS for ChatGPT and web MCP clients
 app.add_middleware(
     CORSMiddleware,
@@ -40,6 +74,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(McpNormalizeMiddleware)
 
 # Mount static files directory if it exists
 static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
