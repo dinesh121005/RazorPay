@@ -15,9 +15,10 @@ dist/
 build/
 .eggs/
 
-# Pytest
+# Pytest & Judge Temp
 .pytest_cache/
 pytest-*/
+judge-*/
 .coverage
 htmlcov/
 
