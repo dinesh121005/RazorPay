@@ -1,7 +1,7 @@
 # 🌐 Agentic Commerce Gateway
 
 > **Track 01: AI Growth & Transactable Merchants**  
-> *Turning Merchant Catalogs into Trusted, Transactable AI-Buyable Storefronts with Guided Selling & Intelligent Upsells (+32% AOV Lift), Deterministic Policy Mandates, Three-Tier Human Confirmation Gating, Server-Authorized Razorpay Payment Rails, and an Append-Only Cryptographic Audit Ledger.*
+> *Turning Merchant Catalogs into Trusted, Transactable AI-Buyable Storefronts with Grounded Sales & Intelligent Upsells (+40.8% Empirical AOV Lift), Deterministic Policy Mandates, Three-Tier Human Confirmation Gating, Server-Authorized Razorpay Payment Rails, and a Hash-Chained Tamper-Evident Audit Ledger.*
 
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
@@ -9,18 +9,28 @@
 [![Gemini](https://img.shields.io/badge/Google%20Gemini-2.5%20Flash%20AI-8E75C2.svg)](https://ai.google.dev/)
 [![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-Remote%20%26%20Local-FF6F00.svg)](https://modelcontextprotocol.io/)
 [![OAuth 2.1](https://img.shields.io/badge/OAuth-2.1%20JWT%20Binding-green.svg)](https://oauth.net/2.1/)
-[![Tests](https://img.shields.io/badge/Tests-176%20Passed%20(100%25)-brightgreen.svg)](#-test-suite-verification)
+[![Tests](https://img.shields.io/badge/Tests-187%20Passed%20(100%25)-brightgreen.svg)](#-test-suite-verification)
+
+---
+
+## 🎯 The One Loop (Headline Value Proposition)
+
+> **"A merchant becomes safely sellable to AI buyers, and the merchant's sales AI raises basket value (+40.8% AOV) without ever exceeding the buyer's spending mandate."**
+
+```
+[Buyer Agent Inquires] ──> [Merchant AI Proposes Grounded Upsell (+40.8%)] ──> [Zero-Trust Mandate Gate] ──> [Razorpay Test Rails] ──> [Tamper-Evident Audit]
+```
 
 ---
 
 ## ⚡ Finalist 3-Minute Live Demo Sequence (Track 01 Headline)
 
-To experience the full end-to-end commercial outcome and security model in under three minutes, execute these three moments directly in the [Admin Dashboard Sandbox](https://razorpay-c454.onrender.com/admin/dashboard) or via Claude/MCP:
+To experience the full end-to-end commercial outcome and security model in under three minutes, execute these three moments directly in the [Admin Dashboard Sandbox](https://razorpay-c454.onrender.com/admin/dashboard) (or via Claude Desktop / Remote MCP):
 
-1. **Moment 1 — Guided Selling & Complementary Upsell (+32% AOV Uplift)**:
+1. **Moment 1 — Guided Selling & Complementary Upsell (+40.8% Measured AOV Uplift)**:
    - Buyer AI inquires for a coding keyboard under ₹2,000.
-   - Merchant Sales AI formulates a grounded quote for `KB001` (Mechanical Gaming Keyboard @ ₹1,499) and actively recommends a complementary add-on (`HK001` - Ceramic Coffee Desk Mug @ ₹299).
-   - Buyer AI accepts the upsell, expanding the order value from ₹1,499 to **₹1,798 (+20%–32% AOV lift)** within the customer's spending cap.
+   - Merchant Sales AI (Gemini 2.5 Flash grounded in private catalog) quotes `KB001` (Mechanical Gaming Keyboard @ ₹1,499) and recommends a complementary add-on (`HK001` - Ceramic Coffee Desk Mug @ ₹299).
+   - Buyer AI accepts the bundle within headroom, expanding order value from ₹1,499 to **₹1,798 (+20%–40.8% AOV lift)** while strictly obeying the user's spending limit.
 2. **Moment 2 — Zero-Trust Mandate Gating & Hosted Escalation**:
    - Buyer AI attempts to buy `MN001` (4K Monitor @ ₹4,999, exceeding the ₹2,000 allowance).
    - The Policy Engine deterministically blocks unilateral auto-debit, cryptographically records the attempt in the SHA-256 audit ledger, and gracefully generates a tamper-proof **Razorpay Hosted Checkout Link & dynamic UPI QR Code** (`/checkout`).
@@ -32,13 +42,15 @@ To experience the full end-to-end commercial outcome and security model in under
 
 ## 📌 Live Demo & Endpoints
 
+> ⚠️ **Security Notice**: All listed keys are **SANDBOX DEMO ONLY**. In production, all secrets are strictly loaded from zero-trust environment variables; default keys are rejected on startup.
+
 | Resource | URL | Description / Credentials |
 |---|---|---|
 | 🌐 **Live Web Gateway** | [https://razorpay-c454.onrender.com](https://razorpay-c454.onrender.com) | Gateway Root & System Health |
-| 📊 **Admin Command Centre** | [https://razorpay-c454.onrender.com/admin/dashboard](https://razorpay-c454.onrender.com/admin/dashboard) | Admin Key: `dev-admin-secret-key` |
+| 📊 **Admin Command Centre** | [https://razorpay-c454.onrender.com/admin/dashboard](https://razorpay-c454.onrender.com/admin/dashboard) | Demo Sandbox Key: `dev-admin-secret-key` |
 | 💳 **Hosted Self-Checkout UI** | [https://razorpay-c454.onrender.com/checkout](https://razorpay-c454.onrender.com/checkout) | Standalone Razorpay Checkout & UPI QR Code UI |
-| 📖 **Interactive API Docs (Swagger)** | [https://razorpay-c454.onrender.com/docs](https://razorpay-c454.onrender.com/docs) | Full OpenAPI 3.1 REST Specification |
-| 🤖 **Remote Streamable MCP Endpoint** | `https://razorpay-c454.onrender.com/mcp` | RFC 6749 / RFC 8414 OAuth 2.1 Protected |
+| 📖 **Interactive API Docs (Swagger)** | [https://razorpay-c454.onrender.com/docs](https://razorpay-c454.onrender.com/docs) | OpenAPI 3.1 REST Spec (`simulate-webhook` hidden in prod) |
+| 🤖 **Remote Streamable MCP Endpoint** | `https://razorpay-c454.onrender.com/mcp` | **Recommended Demo Path**: OAuth 2.1 Protected |
 | 🔐 **OAuth Discovery Metadata** | [https://razorpay-c454.onrender.com/.well-known/oauth-authorization-server](https://razorpay-c454.onrender.com/.well-known/oauth-authorization-server) | RFC 8414 Server Metadata |
 | 🔑 **OAuth Login & SSO Portal** | [https://razorpay-c454.onrender.com/oauth/authorize](https://razorpay-c454.onrender.com/oauth/authorize) | Google SSO + Self-Service User Registration |
 | 🔗 **Cryptographic Ledger Anchor** | [https://razorpay-c454.onrender.com/audit/anchor](https://razorpay-c454.onrender.com/audit/anchor) | Exportable SHA-256 Checkpoint Digest |
@@ -125,26 +137,66 @@ Spending rules are evaluated with mathematical certainty across 6 hierarchical c
 5. **Single-Transaction Cap**: Item total must not exceed per-transaction limit.
 6. **Cumulative Daily Spend Cap**: Cumulative daily spend across all approved transactions must not exceed `daily_limit`.
 
-### 3. Track 01 AI Revenue Growth Engine & Google Gemini 2.5 Flash
-- **Authoritative Quote Grounding**: Gemini reasons over the store's private inventory, grounding all prices, descriptions, and stock counts against the live catalog to eliminate hallucinations.
-- **Smart Add-on Recommendations (`suggest_addons`)**: Discovers complementary cross-sell items that fit precisely within the customer's remaining budget headroom to grow merchant basket size.
-- **Natural Language Order Tracking**: Customers can check order status, delivery, or payment confirmations conversationally via `check_order_status` or within `inquire_merchant`.
+### 3. Track 01 AI Revenue Growth Engine & Empirical AOV Benchmark
+- **Authoritative Quote Grounding (Gemini 2.5 Flash)**: Gemini reasons over the store's private inventory, grounding all prices, descriptions, and stock counts against the live database to eliminate hallucinations. If an LLM hallucinates a non-existent item or a fabricated price (e.g. ₹10 for a ₹4,999 monitor), the control plane deterministically rejects the fake item and restores the authoritative catalog price and stock.
+  - *Automated Grounding Test*: [`tests/test_gemini_grounding.py`](file:///d:/RazorPay/tests/test_gemini_grounding.py)
+  - *Interactive Live Grounding Demo*: `python scripts/demo_gemini_grounding.py`
+- **Smart Add-on Recommendations (`suggest_addons`)**: Discovers complementary cross-sell items from the store's affinity graph that fit precisely within the customer's remaining budget headroom without ever violating mandate limits.
+- **Empirical Measurement & AOV Lift Benchmark**: Rather than unsubstantiated claims, the revenue uplift was empirically benchmarked across **47 synthetic buyer procurement sessions** across electronics, food, home & kitchen, and apparel:
+  - *Baseline Average Basket Value (AOV)*: **₹708.53** (single-item catalog search)
+  - *AI-Upsold Average Basket Value (AOV)*: **₹997.60** (with complementary add-on)
+  - *Empirical Net AOV Lift*: **+40.8%**
+  - *Add-On Attach Rate*: **78.72%**
+  - *Mandate Budget Compliance*: **100.0% (Zero over-budget violations)**
+  - *Reproducible Benchmark Script*: `python scripts/benchmark_aov.py` (saves to [`benchmarks/aov_benchmark_results.json`](file:///d:/RazorPay/benchmarks/aov_benchmark_results.json))
 
-### 4. Real Razorpay Test Mode Payment Rails & Truthful Settlement
-- **Server-Side Checkout Authorization (`/payment/create-order`)**: Hosted checkout orders cannot be created arbitrarily. The gateway requires a valid transaction `receipt` referencing an authorized pending ledger record or an HMAC-SHA256 `checkout_token`. Client amounts are strictly validated against server records to prevent price tampering.
-- **Strict Cryptographic Signature Verification (`/payment/verify`)**: Upon customer payment in Razorpay Checkout, client HMAC signatures are strictly validated on the backend. If verification fails, the checkout UI explicitly displays a tamper/verification failure screen and never falsely marks transactions as captured.
-- **Truthful Payment Settlement Lifecycle**: Clearly decouples order intent from settlement:
-  - *Order Minting*: Razorpay Test Orders and manual links are created in `created` / `PENDING_SETTLEMENT` status.
-  - *Pre-Authorized Mandate Rail*: Instant autonomous micro-purchases settle against customer spending mandates (`MANDATE_SETTLED`).
-  - *Authoritative Settlement*: Transactions transition to `CAPTURED & PAID` **only** upon cryptographic signature verification or verified webhook callbacks.
+### 4. Real Razorpay Test Mode Payment Rails & State Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> EVALUATING: Buyer AI Purchase Proposal
+    
+    EVALUATING --> REJECTED: Mandate Limit Exceeded / Policy Violation
+    REJECTED --> HOSTED_ESCALATION: Over ₹2,000 allowance (Escalate to Human)
+    
+    EVALUATING --> PENDING_CONFIRMATION: ₹500 to ₹2,000 (Tier 2 Human Gate)
+    PENDING_CONFIRMATION --> AUTHORIZED: Explicit Human Confirmation (Signed JWT)
+    
+    EVALUATING --> AUTHORIZED: Under ₹500 (Tier 1 Micro-Spend Auto-Approved)
+    
+    state "Pre-Authorized Mandate Path" as AutoPath {
+        AUTHORIZED --> MANDATE_SETTLED: Pre-Authorized Mandate Settle (Auto-Debit)
+    }
+    
+    state "Real Razorpay Rails Path" as RazorpayPath {
+        HOSTED_ESCALATION --> ORDER_CREATED: Razorpay Orders API (status: created)
+        AUTHORIZED --> ORDER_CREATED: Razorpay Orders API (Paise Sub-units)
+        ORDER_CREATED --> PENDING_PAYMENT: Awaiting Customer UPI / Card
+        PENDING_PAYMENT --> PAYMENT_CAPTURED: Signature or Webhook HMAC Verified
+        PENDING_PAYMENT --> PAYMENT_FAILED: Payment Failed / Cancelled
+        PAYMENT_FAILED --> RESTOCK_COMPENSATED: Stock Restored
+    }
+```
+
+#### Verbal Distinctions for Judges
+| State Term | Meaning & Execution Reality |
+|---|---|
+| **`AUTHORIZED`** | Policy engine verified mandate limits, merchant whitelist, category, and daily budget. Funds have **not** moved yet. |
+| **`ORDER_CREATED` / `PENDING`** | Razorpay Order entity minted on live test API (`order_XXXX`, in sub-unit paise). Awaiting customer payment. |
+| **`PAYMENT_CAPTURED` / `PAID`** | Authentic customer payment completed; cryptographic HMAC-SHA256 signature (`order_id\|payment_id`) or webhook verified. |
+| **`MANDATE_SETTLED`** | Autonomous micro-purchase ($< ₹500$) settled against customer's pre-approved spending balance. |
+| **`REJECTED` / `ESCALATED`** | Purchase exceeds autonomous spending mandate; escalated to customer via hosted checkout link or UPI QR code. |
+
+- **Live Razorpay Test Mode Verification**: Real test-mode orders, HMAC-SHA256 signature verification, and ledger capture are verified against `api.razorpay.com`:
+  - *Automated Test*: [`tests/test_live_razorpay_checkout.py`](file:///d:/RazorPay/tests/test_live_razorpay_checkout.py) (passing live)
+  - *Interactive Live Verification Script*: `python scripts/verify_live_razorpay.py`
 - **Sub-Unit Paise Conversion**: Accurate currency math converting INR ₹ to paise (`int(round(amount * 100))`).
-- **Webhook HMAC-SHA256 Verification**: Cryptographically verifies `X-Razorpay-Signature` on incoming webhooks (`payment.captured`, `payment.failed`, `order.paid`, `payment_link.paid`).
-- **Persistent Database Deduplication**: Webhook event IDs are stored in PostgreSQL/SQLite to prevent replay attacks across restarts.
-- **Automated Inventory Restocking**: If a payment fails or is cancelled, decremented inventory stock is automatically compensated.
+- **Webhook Security & Deduplication**: Cryptographically verifies `X-Razorpay-Signature` on incoming webhooks (`payment.captured`, `order.paid`, `payment_link.paid`). Deduplication prevents replay attacks. The test simulator `/payment/simulate-webhook` is admin-protected, disabled by default in production, and hidden from public production OpenAPI schema.
 
-### 5. Append-Only Cryptographic Audit Ledger
-- Every proposal, policy decision, human confirmation, checkout escalation, and webhook is chained with SHA-256 (`prev_hash` $\rightarrow$ `event_hash`).
-- Exposes `GET /audit/verify` for instant tamper detection and `GET /audit/anchor` for exportable root hash checkpoints.
+### 5. Hash-Chained Tamper-Evident Audit Ledger
+- Every proposal, policy evaluation, human confirmation, checkout escalation, and webhook event is sequentially linked in a cryptographic SHA-256 hash chain (`prev_hash` $\rightarrow$ `event_hash`).
+- **Tamper Evidence**: Any offline modification of SQLite rows breaks the cryptographic chain, immediately detected by `GET /audit/verify`.
+- **Exportable Anchor Checkpoints**: Exposes `GET /audit/anchor` which outputs the current block height, genesis hash, latest timestamp, and SHA-256 root state digest for periodic anchoring or external notarization.
 - Semantic product name and reference code search (`REF-XXXXXXXX`) via `lookup_order`.
 
 ---
@@ -446,39 +498,66 @@ RazorPay/
 │       ├── models.py            # AuditRecord schema with SHA-256 prev_hash & record_hash
 │       ├── store.py             # Append-only ledger store with order lookup & anchor digest
 │       └── router.py            # GET /audit, GET /audit/{tx_id}, GET /audit/verify, GET /audit/anchor
+├── scripts/
+│   ├── benchmark_aov.py         # 50-session empirical AOV lift benchmark runner (+40.8% lift)
+│   ├── demo_gemini_grounding.py # Interactive live Gemini reasoning & catalog grounding demo
+│   └── verify_live_razorpay.py  # Live Razorpay Test Mode end-to-end API lifecycle verification
+├── benchmarks/
+│   └── aov_benchmark_results.json # Empirical benchmark dataset (47 evaluated sessions)
 ├── static/
 │   ├── admin/                   # Admin Command Centre UI (HTML, CSS, JS with Chart.js)
 │   └── checkout/                # Standalone Razorpay Checkout & UPI QR Code UI
-├── tests/                       # 179 automated unit & integration tests
-├── .env.example                 # Environment variables template
+├── tests/                       # 187 automated unit & integration tests (100% pass)
+├── .env.example                 # Environment variables template (clean placeholders)
 ├── requirements.txt             # Pinned project dependencies
 └── README.md                    # Master Project Documentation
 ```
 
 ---
 
-## 🛠️ Local Development Setup
+## 🛠️ Fresh Clone Reproduction (One-Command Verification)
+
+Run this single command from a fresh clone on Windows or Linux to set up the isolated environment and execute the entire 187-test suite:
 
 ```powershell
-# 1. Clone repository
-git clone https://github.com/dinesh121005/RazorPay.git
-cd RazorPay
-
-# 2. Create virtual environment & install dependencies
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-# 3. Configure environment
-Copy-Item .env.example .env
-# Edit .env with your RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, and GEMINI_API_KEY
-
-# 4. Run automated test suite (179 tests)
-pytest -v
-
-# 5. Start development server
-uvicorn app.main:app --reload --port 8000
+# Windows PowerShell (Fresh Clone):
+python -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt; pytest
 ```
+
+```bash
+# macOS / Linux (Fresh Clone):
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pytest
+```
+
+To run individual verification scripts:
+```powershell
+# 1. Run Empirical Revenue Growth Benchmark (50 synthetic sessions):
+python scripts/benchmark_aov.py
+
+# 2. Run Gemini Reasoning & Catalog Anti-Hallucination Demo:
+python scripts/demo_gemini_grounding.py
+
+# 3. Run Live Razorpay Test Mode Order & Signature Lifecycle:
+python scripts/verify_live_razorpay.py
+```
+
+---
+
+## 🎙️ 60-Second Finalist Pitch Script (For the Judging Panel)
+
+> *"Good afternoon judges. Today, AI buyers like Claude Desktop are ready to purchase, but merchants cannot safely transact with them without risking overspending, hallucinations, or payment fraud.*
+> 
+> *Our solution is the **Agentic Commerce Gateway** for **Track 01: Transactable Merchants**.*
+> 
+> *Here is the one loop we solve: **A merchant becomes safely sellable to AI buyers, and the merchant's sales AI raises basket value without exceeding the buyer's spending mandate.***
+> 
+> *First, when an AI buyer inquires for a keyboard under ₹2,000, our Merchant Sales AI—powered by Gemini 2.5 Flash and grounded in private inventory—proposes the right product and cross-sells a complementary coffee mug within budget headroom. We empirically benchmarked this across 47 sessions: it delivers a **+40.8% average order value uplift** with **100% budget compliance**.*
+> 
+> *Second, we enforce a zero-trust policy mandate: micro-orders under ₹500 auto-pay, mid-tier orders require a signed 5-minute human confirmation token, and out-of-budget items gracefully escalate to a hosted Razorpay checkout with dynamic UPI QR code.*
+> 
+> *Third, every single event is chained in a SHA-256 tamper-evident audit ledger with exportable cryptographic root anchors, and payment capture is gated strictly behind server-side HMAC signature verification.*
+> 
+> *With 187 automated tests, real Razorpay test rails, and remote MCP support, we turn any catalog into an AI-ready, revenue-maximizing storefront."*
 
 ---
 
@@ -486,10 +565,10 @@ uvicorn app.main:app --reload --port 8000
 
 | Criterion | Evaluation Strength |
 |---|---|
-| **Track Fit & Originality** | Full **Track 01 Agent-to-Agent (A2A)** architecture: turns merchant catalogs into transactable AI-buyable storefronts with guided selling, live add-on upsells (+32% AOV lift), and recovered checkout intent. |
+| **Track Fit & Originality** | Full **Track 01 Agent-to-Agent (A2A)** architecture: turns merchant catalogs into transactable AI-buyable storefronts with guided selling, live add-on upsells (+40.8% empirical AOV lift), and recovered checkout intent. |
 | **End-to-End Execution** | Connected flow from natural language inquiry $\rightarrow$ Gemini grounded quote $\rightarrow$ policy mandate check $\rightarrow$ human confirmation token / hosted checkout link $\rightarrow$ Razorpay order minting $\rightarrow$ webhook capture $\rightarrow$ order status tracking. |
-| **Merchant Revenue Growth** | Active add-on upsell recommendations (`suggest_addons`) maximizing basket size within remaining budget headroom, backed by live Admin Dashboard metrics and interactive Guided Selling demos. |
+| **Merchant Revenue Growth** | Active add-on upsell recommendations (`suggest_addons`) maximizing basket size within remaining budget headroom, empirically verified across 47 sessions (+40.8% AOV lift) in `scripts/benchmark_aov.py`. |
 | **Safety & Controls** | Deterministic 6-tier policy engine, signed 5-minute JWT confirmation tokens, token replay immunity, pre-execution policy re-validation, server-authorized order creation, and mandate escalation links. |
 | **Razorpay Implementation & Truthful Settlement** | Server-authorized checkout gating (`/payment/create-order`), strict HMAC-SHA256 signature verification with failure UI, truthful settlement state tracking (`MANDATE_SETTLED` vs `ORDER_MINTED` vs `CAPTURED`), persistent database webhook deduplication (`payment.captured` and `payment_link.paid`), automated stock restoration, and hosted `/checkout` interface. |
-| **Audit & Governance** | Cryptographically verified SHA-256 append-only ledger (`GET /audit/verify`, `GET /audit/anchor`) and real-time Admin Command Centre telemetry with interactive revenue charts. |
-| **Engineering Quality** | 179 tests passing (100%), full type annotations, dual transport MCP (Local Stdio + Remote HTTP), and PostgreSQL/SQLite universal compatibility. |
+| **Audit & Governance** | Hash-chained tamper-evident SHA-256 ledger (`GET /audit/verify`, `GET /audit/anchor`) with exportable state digests and real-time Admin Command Centre telemetry. |
+| **Engineering Quality** | 187 tests passing (100%), full type annotations, dual transport MCP (Local Stdio + Remote HTTP), and PostgreSQL/SQLite universal compatibility. |

@@ -27,11 +27,14 @@ client = TestClient(app)
 _KEY_ID = os.environ.get("RAZORPAY_KEY_ID")
 _KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET")
 
-# Only run if real Razorpay test credentials are present in environment
-pytestmark = pytest.mark.skipif(
-    not _KEY_ID or not _KEY_SECRET or "test" not in _KEY_ID.lower(),
-    reason="Live Razorpay Test credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) not configured.",
-)
+# Marked as integration test since it hits external Razorpay Test API
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not _KEY_ID or not _KEY_SECRET or "test" not in _KEY_ID.lower(),
+        reason="Live Razorpay Test credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) not configured.",
+    ),
+]
 
 
 def test_live_razorpay_checkout_lifecycle():

@@ -1,0 +1,202 @@
+{
+  "benchmark_metadata": {
+    "total_synthetic_sessions": 50,
+    "evaluated_sessions": 47,
+    "target_track": "Track 01: AI Growth & Transactable Merchants",
+    "model_tested": "MerchantAgentService with Cross-Sell Affinity & Budget Headroom Guardrails"
+  },
+  "empirical_metrics": {
+    "average_baseline_aov_inr": 708.53,
+    "average_upsold_aov_inr": 997.6,
+    "net_aov_lift_percentage": 40.8,
+    "successful_addon_attach_rate_percentage": 78.72,
+    "budget_compliance_rate_percentage": 100.0,
+    "zero_budget_violations_guarantee": true
+  },
+  "sample_sessions": [
+    {
+      "session_id": 1,
+      "query": "mechanical gaming keyboard for coding",
+      "budget": 2000.0,
+      "base_product": {
+        "id": "KB001",
+        "name": "Mechanical Gaming Keyboard",
+        "price": 1499.0
+      },
+      "addon": {
+        "product_id": "HK001",
+        "name": "Ceramic Coffee Mug (350ml)",
+        "price": 499.0
+      },
+      "base_basket_value": 1499.0,
+      "upsold_basket_value": 1998.0,
+      "absolute_lift": 499.0,
+      "percentage_lift": 33.29,
+      "within_budget": true
+    },
+    {
+      "session_id": 2,
+      "query": "wireless mouse for work",
+      "budget": 1500.0,
+      "base_product": {
+        "id": "EL001",
+        "name": "Ergonomic Wireless Optical Mouse",
+        "price": 899.0
+      },
+      "addon": {
+        "product_id": "EL006",
+        "name": "Braided USB-C Fast Charging Cable (2m)",
+        "price": 399.0
+      },
+      "base_basket_value": 899.0,
+      "upsold_basket_value": 1298.0,
+      "absolute_lift": 399.0,
+      "percentage_lift": 44.38,
+      "within_budget": true
+    },
+    {
+      "session_id": 3,
+      "query": "ceramic coffee mug for desk",
+      "budget": 800.0,
+      "base_product": {
+        "id": "HK001",
+        "name": "Ceramic Coffee Mug (350ml)",
+        "price": 499.0
+      },
+      "addon": null,
+      "base_basket_value": 499.0,
+      "upsold_basket_value": 499.0,
+      "absolute_lift": 0.0,
+      "percentage_lift": 0.0,
+      "within_budget": true
+    },
+    {
+      "session_id": 4,
+      "query": "insulated water bottle",
+      "budget": 1200.0,
+      "base_product": {
+        "id": "HK002",
+        "name": "Salem Stainless Steel Water Bottle (1L)",
+        "price": 899.0
+      },
+      "addon": null,
+      "base_basket_value": 899.0,
+      "upsold_basket_value": 899.0,
+      "absolute_lift": 0.0,
+      "percentage_lift": 0.0,
+      "within_budget": true
+    },
+    {
+      "session_id": 5,
+      "query": "filter coffee powder degree",
+      "budget": 600.0,
+      "base_product": {
+        "id": "FD007",
+        "name": "Kumbakonam Degree Filter Coffee Blend (500g)",
+        "price": 420.0
+      },
+      "addon": {
+        "product_id": "FD011",
+        "name": "Manapparai Crispy Garlic Butter Murukku (250g)",
+        "price": 149.0
+      },
+      "base_basket_value": 420.0,
+      "upsold_basket_value": 569.0,
+      "absolute_lift": 149.0,
+      "percentage_lift": 35.48,
+      "within_budget": true
+    },
+    {
+      "session_id": 6,
+      "query": "cold pressed coconut oil",
+      "budget": 900.0,
+      "base_product": {
+        "id": "FD001",
+        "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
+        "price": 349.0
+      },
+      "addon": {
+        "product_id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "base_basket_value": 349.0,
+      "upsold_basket_value": 648.0,
+      "absolute_lift": 299.0,
+      "percentage_lift": 85.67,
+      "within_budget": true
+    },
+    {
+      "session_id": 7,
+      "query": "healthy rolled oats breakfast",
+      "budget": 700.0,
+      "base_product": {
+        "id": "FD002",
+        "name": "Organic Rolled Oats & Samai Millet (1kg)",
+        "price": 299.0
+      },
+      "addon": {
+        "product_id": "FD001",
+        "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
+        "price": 349.0
+      },
+      "base_basket_value": 299.0,
+      "upsold_basket_value": 648.0,
+      "absolute_lift": 349.0,
+      "percentage_lift": 116.72,
+      "within_budget": true
+    },
+    {
+      "session_id": 8,
+      "query": "cotton crew neck t-shirt",
+      "budget": 1000.0,
+      "base_product": {
+        "id": "AP001",
+        "name": "Tiruppur Organic Cotton Crew T-Shirt",
+        "price": 799.0
+      },
+      "addon": null,
+      "base_basket_value": 799.0,
+      "upsold_basket_value": 799.0,
+      "absolute_lift": 0.0,
+      "percentage_lift": 0.0,
+      "within_budget": true
+    },
+    {
+      "session_id": 9,
+      "query": "french press coffee maker",
+      "budget": 1800.0,
+      "base_product": {
+        "id": "HK005",
+        "name": "French Press Coffee & Tea Maker (600ml)",
+        "price": 999.0
+      },
+      "addon": {
+        "product_id": "FD007",
+        "name": "Kumbakonam Degree Filter Coffee Blend (500g)",
+        "price": 420.0
+      },
+      "base_basket_value": 999.0,
+      "upsold_basket_value": 1419.0,
+      "absolute_lift": 420.0,
+      "percentage_lift": 42.04,
+      "within_budget": true
+    },
+    {
+      "session_id": 10,
+      "query": "cast iron dosa tawa",
+      "budget": 1600.0,
+      "base_product": {
+        "id": "HK006",
+        "name": "Pre-Seasoned Cast Iron Dosa Tawa & Skillet (10-inch)",
+        "price": 1499.0
+      },
+      "addon": null,
+      "base_basket_value": 1499.0,
+      "upsold_basket_value": 1499.0,
+      "absolute_lift": 0.0,
+      "percentage_lift": 0.0,
+      "within_budget": true
+    }
+  ]
+}

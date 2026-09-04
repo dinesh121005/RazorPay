@@ -374,6 +374,7 @@ class SimulateWebhookRequest(BaseModel):
     status_code=status.HTTP_200_OK,
     summary="Simulate incoming Razorpay webhook for test-mode settlement",
     dependencies=[Depends(verify_admin_key)],
+    include_in_schema=os.environ.get("ENVIRONMENT", "development").lower() != "production",
 )
 def simulate_webhook(payload: SimulateWebhookRequest):
     """
