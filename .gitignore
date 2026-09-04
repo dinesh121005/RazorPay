@@ -17,8 +17,10 @@ build/
 
 # Pytest & Judge Temp
 .pytest_cache/
+.pytest_temp/
 pytest-*/
 judge-*/
+*.db-journal
 .coverage
 htmlcov/
 
