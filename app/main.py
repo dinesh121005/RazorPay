@@ -12,6 +12,7 @@ logging.basicConfig(
 )
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -29,6 +30,15 @@ app = FastAPI(
     description="Merchant-side gateway enabling AI shopping agents to transact under bounded, auditable policy mandates.",
     version="1.0.0",
     lifespan=remote_mcp_lifespan,
+)
+
+# Enable CORS for ChatGPT and web MCP clients
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Mount static files directory if it exists

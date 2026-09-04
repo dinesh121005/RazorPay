@@ -55,6 +55,7 @@ GOOGLE_REDIRECT_URI = os.getenv(
 ALLOWED_REDIRECT_URIS: Set[str] = {
     "https://claude.ai/api/mcp/oauth_callback",
     "https://claude.ai/oauth/callback",
+    "https://chatgpt.com/connector_platform_oauth_redirect",
     "https://chatgpt.com/api/aip/v1/auth/oauth/callback",
     "https://chat.openai.com/aip/v1/auth/oauth/callback",
     "http://localhost:8000/oauth/callback",
@@ -63,6 +64,15 @@ ALLOWED_REDIRECT_URIS: Set[str] = {
     "https://127.0.0.1:8000/oauth/callback",
     "http://localhost:3000/callback",
 }
+
+
+def register_dynamic_client(client_id: str, client_secret: str, redirect_uris: List[str]) -> None:
+    """Registers an OAuth client dynamically per RFC 7591."""
+    ALLOWED_CLIENT_IDS.add(client_id)
+    for uri in redirect_uris:
+        if uri:
+            ALLOWED_REDIRECT_URIS.add(uri)
+
 
 
 def is_allowed_redirect_uri(redirect_uri: Optional[str]) -> bool:

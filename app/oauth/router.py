@@ -25,6 +25,7 @@ from app.oauth.store import (
     is_allowed_client_id,
     is_allowed_redirect_uri,
     provision_new_customer,
+    register_dynamic_client,
 )
 
 router = APIRouter(tags=["oauth"])
@@ -75,12 +76,59 @@ def get_oauth_authorization_server_metadata(request: Request) -> dict:
         "issuer": base_url,
         "authorization_endpoint": f"{base_url}/oauth/authorize",
         "token_endpoint": f"{base_url}/oauth/token",
+        "registration_endpoint": f"{base_url}/oauth/register-client",
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code", "refresh_token"],
         "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic", "none"],
         "scopes_supported": ["purchase"],
         "code_challenge_methods_supported": ["S256"],
     }
+
+
+class DynamicClientRegistrationRequest(BaseModel):
+    client_name: Optional[str] = "ChatGPT Connector"
+    redirect_uris: Optional[list] = None
+    grant_types: Optional[list] = ["authorization_code", "refresh_token"]
+    response_types: Optional[list] = ["code"]
+    token_endpoint_auth_method: Optional[str] = "none"
+
+
+@router.post(
+    "/oauth/register-client",
+    status_code=status.HTTP_201_CREATED,
+    summary="Dynamic Client Registration (RFC 7591)",
+    description="Registers an OAuth client dynamically and returns client credentials."
+)
+async def register_oauth_client(request: Request):
+    """RFC 7591 Dynamic Client Registration endpoint."""
+    import secrets
+    import time
+    body = {}
+    if request.headers.get("content-type", "").startswith("application/json"):
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+    client_id = f"client_{secrets.token_urlsafe(16)}"
+    client_secret = secrets.token_urlsafe(32)
+    redirect_uris = body.get("redirect_uris") or []
+
+    register_dynamic_client(client_id, client_secret, redirect_uris)
+
+    return JSONResponse(
+        status_code=201,
+        content={
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "client_name": body.get("client_name", "ChatGPT Connector"),
+            "redirect_uris": redirect_uris,
+            "grant_types": body.get("grant_types", ["authorization_code", "refresh_token"]),
+            "response_types": body.get("response_types", ["code"]),
+            "token_endpoint_auth_method": body.get("token_endpoint_auth_method", "none"),
+            "client_id_issued_at": int(time.time()),
+        }
+    )
 
 
 @router.get(
