@@ -23,9 +23,11 @@ from app.exceptions import (
     MandateNotFoundError,
     ProductNotFoundError,
 )
+import os
+import urllib.parse
 from app.oauth.crypto import JWT_SECRET
 from app.payment import PaymentResult, create_order_for_approved
-from app.payment.service import create_payment_link_for_manual
+from app.payment.service import create_payment_link_for_manual, generate_checkout_token
 from app.policy.engine import evaluate
 from app.policy.requests import PurchaseRequest
 from app.policy.store import mandate_store
@@ -104,13 +106,26 @@ def _build_replayed_response(record: AuditRecord) -> "PurchaseResponse":
     limit = mandate.max_transaction_amount if mandate else record.amount
     payment = None
     if record.payment_status is not None:
-        short_url = f"https://rzp.io/i/{record.razorpay_order_id or record.transaction_id[:12]}"
+        base_url = os.environ.get("BASE_URL", "https://razorpay-c454.onrender.com").rstrip("/")
+        effective_key = os.environ.get("RAZORPAY_KEY_ID") or "rzp_test_51tPkUG58N7Lkg"
+        checkout_token = generate_checkout_token(record.transaction_id, record.amount, record.customer_id)
+        query = urllib.parse.urlencode({
+            "order_id": record.razorpay_order_id or f"order_{record.transaction_id.replace('-', '')[:16]}",
+            "amount": f"{record.amount:.2f}",
+            "product": record.product_id,
+            "key": effective_key,
+            "customer": record.customer_id,
+            "receipt": record.transaction_id,
+            "token": checkout_token,
+            "auto_open": "1",
+        })
+        checkout_url = f"{base_url}/checkout?{query}"
         payment = PaymentResult(
             status=record.payment_status,
             razorpay_order_id=record.razorpay_order_id,
             razorpay_payment_id=record.razorpay_payment_id,
-            payment_url=short_url,
-            qr_code_url=f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={short_url}",
+            payment_url=checkout_url,
+            qr_code_url=f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(checkout_url)}",
             payment_method="auto_debit" if record.payment_status == "captured" else "razorpay_order",
         )
     return PurchaseResponse(

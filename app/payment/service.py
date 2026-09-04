@@ -137,6 +137,7 @@ def create_payment_link_for_manual(
         "customer": customer_id,
         "receipt": receipt,
         "token": checkout_token,
+        "auto_open": "1",
     })
     checkout_url = f"{base_url}/checkout?{query}"
     qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(checkout_url)}"
@@ -186,12 +187,25 @@ def create_order_for_approved(
             )
 
         order_id = response.get("id")
-        short_url = f"https://rzp.io/i/{order_id}"
-        qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={short_url}"
+        base_url = os.environ.get("BASE_URL", "https://razorpay-c454.onrender.com").rstrip("/")
+        effective_key = os.environ.get("RAZORPAY_KEY_ID") or "rzp_test_51tPkUG58N7Lkg"
+        checkout_token = generate_checkout_token(receipt, amount_inr, customer_id)
+        query = urllib.parse.urlencode({
+            "order_id": order_id,
+            "amount": f"{amount_inr:.2f}",
+            "product": product_id,
+            "key": effective_key,
+            "customer": customer_id,
+            "receipt": receipt,
+            "token": checkout_token,
+            "auto_open": "1",
+        })
+        checkout_url = f"{base_url}/checkout?{query}"
+        qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(checkout_url)}"
         return PaymentResult(
             status=response["status"],
             razorpay_order_id=order_id,
-            payment_url=short_url,
+            payment_url=checkout_url,
             qr_code_url=qr_code_url,
             payment_method="razorpay_order",
         )
