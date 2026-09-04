@@ -328,24 +328,35 @@ def execute_purchase(
                 razorpay_order_id=payment_result.razorpay_order_id,
             )
         else:
-            # 2. Auto-debit customer pre-authorized balance
-            wallet_store.debit(customer_id, amount)
-            # Decrement inventory stock on successful order creation
-            decrement_stock(product.id, quantity)
+            # 2. Auto-debit customer pre-authorized sandbox mandate balance
+            debit_success, remaining_bal, debit_msg = wallet_store.debit(customer_id, amount)
+            if not debit_success:
+                final_decision = "PAYMENT_FAILED"
+                decision_reason = f"Policy approved purchase of {product.name} (₹{amount:.2f}), but sandbox mandate wallet debit failed: {debit_msg}"
+                payment_result.status = "failed"
+                payment_result.error = debit_msg
+                audit_store.update_payment_outcome(
+                    transaction_id=transaction_id,
+                    payment_status="failed",
+                    razorpay_order_id=payment_result.razorpay_order_id,
+                )
+            else:
+                # Decrement inventory stock on successful order creation & wallet debit
+                decrement_stock(product.id, quantity)
 
-            # 3. Automatic rail settlement: mint authentic payment ID & capture
-            payment_id = f"pay_mandate_{uuid4().hex[:14]}"
-            payment_result.status = "captured"
-            payment_result.razorpay_payment_id = payment_id
-            payment_result.payment_method = "auto_debit"
+                # 3. Transparent simulated mandate settlement: mint authentic tracking ID & record capture
+                payment_id = f"pay_mandate_{uuid4().hex[:14]}"
+                payment_result.status = "captured"
+                payment_result.razorpay_payment_id = payment_id
+                payment_result.payment_method = "auto_debit"
 
-            # Phase B Audit: Update row with settled payment outcome & payment_id
-            audit_store.update_payment_outcome(
-                transaction_id=transaction_id,
-                payment_status="captured",
-                razorpay_order_id=payment_result.razorpay_order_id,
-                razorpay_payment_id=payment_id,
-            )
+                # Phase B Audit: Update row with settled payment outcome & payment_id
+                audit_store.update_payment_outcome(
+                    transaction_id=transaction_id,
+                    payment_status="captured",
+                    razorpay_order_id=payment_result.razorpay_order_id,
+                    razorpay_payment_id=payment_id,
+                )
     elif decision.status == "REJECTED":
         # Out-of-mandate graceful escalation: generate Payment Link & UPI QR so customer can pay via their own app
         payment_result = create_payment_link_for_manual(
@@ -467,25 +478,36 @@ def confirm_purchase(
             razorpay_order_id=payment_result.razorpay_order_id,
         )
     else:
-        final_decision = "APPROVED"
-        reason = f"Human confirmation verified. Transaction approved and payment captured on Razorpay rail for ₹{amount:.2f}."
         # Auto-debit customer pre-authorized balance
-        wallet_store.debit(token_customer_id, amount)
-        # Decrement real stock
-        decrement_stock(product.id, quantity)
+        debit_success, remaining_bal, debit_msg = wallet_store.debit(token_customer_id, amount)
+        if not debit_success:
+            final_decision = "PAYMENT_FAILED"
+            reason = f"Human confirmation verified, but sandbox mandate wallet debit failed: {debit_msg}"
+            payment_result.status = "failed"
+            payment_result.error = debit_msg
+            audit_store.update_payment_outcome(
+                transaction_id=transaction_id,
+                payment_status="failed",
+                razorpay_order_id=payment_result.razorpay_order_id,
+            )
+        else:
+            final_decision = "APPROVED"
+            reason = f"Human confirmation verified. Transaction approved and settled via customer simulated mandate balance for ₹{amount:.2f} (Razorpay Order: {payment_result.razorpay_order_id})."
+            # Decrement real stock
+            decrement_stock(product.id, quantity)
 
-        payment_id = f"pay_mandate_{uuid4().hex[:14]}"
-        payment_result.status = "captured"
-        payment_result.razorpay_payment_id = payment_id
-        payment_result.payment_method = "auto_debit"
+            payment_id = f"pay_mandate_{uuid4().hex[:14]}"
+            payment_result.status = "captured"
+            payment_result.razorpay_payment_id = payment_id
+            payment_result.payment_method = "auto_debit"
 
-        # 5. Update audit record to final approved state
-        audit_store.update_payment_outcome(
-            transaction_id=transaction_id,
-            payment_status="captured",
-            razorpay_order_id=payment_result.razorpay_order_id,
-            razorpay_payment_id=payment_id,
-        )
+            # 5. Update audit record to final approved state
+            audit_store.update_payment_outcome(
+                transaction_id=transaction_id,
+                payment_status="captured",
+                razorpay_order_id=payment_result.razorpay_order_id,
+                razorpay_payment_id=payment_id,
+            )
 
     return PurchaseResponse(
         decision=final_decision,

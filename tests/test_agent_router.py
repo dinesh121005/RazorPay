@@ -417,4 +417,35 @@ def test_confirmation_policy_re_evaluation_rejects_if_mandate_revoked():
         )
 
 
+def test_auto_pay_fails_if_sandbox_wallet_balance_insufficient():
+    """
+    Verifies that if customer sandbox mandate wallet balance is insufficient,
+    the purchase execution halts with PAYMENT_FAILED and does NOT decrement stock or capture payment.
+    """
+    from app.wallet.store import wallet_store
+    from app.catalog.service import get_product
+
+    # Drain wallet balance for CUST001 to ₹0.00
+    wallet_store.set_balance("CUST001", 0.0)
+    stock_before = get_product("FD001").stock
+
+    # Attempt micro-purchase (FD001 @ ₹349, under ₹500 auto-confirm threshold)
+    with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
+        resp = client.post(
+            "/agent/purchase",
+            json={"customer_id": "CUST001", "product_id": "FD001", "quantity": 1},
+            headers=_ADMIN_HEADERS,
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["decision"] == "PAYMENT_FAILED"
+    assert "sandbox mandate wallet debit failed" in data["reason"]
+    assert data["payment"]["status"] == "failed"
+
+    # Stock must NOT have decremented
+    stock_after = get_product("FD001").stock
+    assert stock_after == stock_before
+
+
 

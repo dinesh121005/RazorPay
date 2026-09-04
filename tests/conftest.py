@@ -15,26 +15,34 @@ os.environ["ADMIN_API_KEY"] = "test-admin-secret-key"
 from app.audit import audit_store
 from app.oauth.store import customer_auth_store
 from app.policy.store import DEMO_MANDATES, mandate_store
+from app.wallet.store import wallet_store
 
 
 @pytest.fixture(autouse=True)
 def isolate_test_environment(tmp_path, monkeypatch):
     """
     Autouse fixture that runs before every test:
-    - Points audit_store.db_path and customer_auth_store.db_path to an isolated temporary SQLite database file.
-    - Initializes the audit_records and customer_credentials schemas in the temporary database.
+    - Points audit_store, customer_auth_store, mandate_store, and wallet_store to an isolated temp SQLite DB.
+    - Initializes schemas in the temporary database.
     - Resets the in-memory mandate store to DEMO_MANDATES.
+    - Performs clean teardown with garbage collection to release SQLite file handles on Windows.
     """
+    import gc
     test_db = str(tmp_path / "test_isolated_gateway.db")
     monkeypatch.setenv("DATABASE_URL", test_db)
     monkeypatch.setattr(audit_store, "db_path", test_db)
     monkeypatch.setattr(customer_auth_store, "db_path", test_db)
     monkeypatch.setattr(mandate_store, "db_path", test_db)
+    monkeypatch.setattr(wallet_store, "db_path", test_db)
     audit_store._init_db()
     customer_auth_store._init_db()
     mandate_store._init_db()
+    wallet_store._init_db()
 
     yield test_db
+
+    # Force garbage collection to close lingering SQLite file connections on Windows
+    gc.collect()
 
 
 @pytest.fixture

@@ -85,9 +85,15 @@ class WalletStore:
             row = cursor.fetchone()
             if row:
                 return float(row[0])
-            # If not yet seeded, provision default ₹2,000 balance
+            # If not yet seeded, provision default balance scaled to customer mandate limit
             now = time.time()
-            default_balance = 2000.0
+            try:
+                from app.policy.store import mandate_store
+                mandate = mandate_store.get_mandate(customer_id)
+                default_balance = max(mandate.max_transaction_amount * 2, 10000.0) if mandate else 10000.0
+            except Exception:
+                default_balance = 10000.0
+
             cursor.execute(
                 """
                 INSERT INTO customer_wallets (customer_id, balance, currency, created_at, updated_at)

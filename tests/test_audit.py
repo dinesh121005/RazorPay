@@ -135,6 +135,36 @@ def test_audit_tamper_detection(tmp_path):
     assert "Corrupted event hash" in res["error"]
 
 
+def test_audit_projection_tamper_detection(tmp_path):
+    """
+    Directly tampering with the mutable audit_records projection table (without modifying audit_events)
+    is caught by projection reconciliation during verify_integrity().
+    """
+    db_file = str(tmp_path / "unit_test_proj_tamper.db")
+    store = AuditStore(db_path=db_file)
+
+    store.write_proposal(
+        transaction_id="txn-proj-1",
+        customer_id="CUST001",
+        product_id="KB001",
+        merchant_id="MERCH_ELEC",
+        quantity=1,
+        amount=1499.0,
+        decision="APPROVED",
+        decision_reason="Approved",
+    )
+
+    # Directly tamper with audit_records projection record_hash
+    with store._get_connection() as conn:
+        conn.cursor().execute("UPDATE audit_records SET record_hash = 'TAMPERED_HASH' WHERE transaction_id = 'txn-proj-1'")
+        conn.commit()
+
+    res = store.verify_integrity()
+    assert res["valid"] is False
+    assert "Projection tampering detected" in res["error"]
+    assert res["broken_record_id"] == "txn-proj-1"
+
+
 def test_audit_get_daily_spend(tmp_path):
     """
     get_daily_spend correctly sums approved transactions for a given customer and date.

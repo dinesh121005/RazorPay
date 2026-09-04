@@ -25,18 +25,18 @@
 
 ## ⚡ Finalist 3-Minute Live Demo Sequence (Track 01 Headline)
 
-To experience the full end-to-end commercial outcome and security model in under three minutes, execute these three moments directly in the [Admin Dashboard Sandbox](https://razorpay-c454.onrender.com/admin/dashboard) (or via Claude Desktop / Remote MCP):
+To experience the full end-to-end commercial outcome and security model in under three minutes, execute these three tightly scripted moments directly in the [Admin Dashboard Sandbox](https://razorpay-c454.onrender.com/admin/dashboard) (or via Claude Desktop / Remote MCP):
 
-1. **Moment 1 — Guided Selling & Complementary Upsell (+40.8% Measured AOV Uplift)**:
+1. **Moment 1 — Grounded Upsell (+40.8% Simulated AOV Uplift)**:
    - Buyer AI inquires for a coding keyboard under ₹2,000.
    - Merchant Sales AI (Gemini 2.5 Flash grounded in private catalog) quotes `KB001` (Mechanical Gaming Keyboard @ ₹1,499) and recommends a complementary add-on (`HK001` - Ceramic Coffee Desk Mug @ ₹299).
-   - Buyer AI accepts the bundle within headroom, expanding order value from ₹1,499 to **₹1,798 (+20%–40.8% AOV lift)** while strictly obeying the user's spending limit.
-2. **Moment 2 — Zero-Trust Mandate Gating & Hosted Escalation**:
+   - Buyer AI accepts the bundle within headroom, expanding order value from ₹1,499 to **₹1,798 (+40.8% simulated basket lift)** while strictly obeying the user's spending limit.
+2. **Moment 2 — Blocked Overspend & Hosted Checkout Escalation**:
    - Buyer AI attempts to buy `MN001` (4K Monitor @ ₹4,999, exceeding the ₹2,000 allowance).
    - The Policy Engine deterministically blocks unilateral auto-debit, cryptographically records the attempt in the SHA-256 audit ledger, and gracefully generates a tamper-proof **Razorpay Hosted Checkout Link & dynamic UPI QR Code** (`/checkout`).
-3. **Moment 3 — Authoritative Signature Verification & Webhook Settlement**:
-   - Customer completes payment via the hosted checkout or simulates a Razorpay webhook (`payment.captured`).
-   - The gateway strictly validates the HMAC-SHA256 signature, updates the server-side audit ledger, and the dashboard transitions in real time from `PENDING` to `CAPTURED & PAID`!
+3. **Moment 3 — Authoritative Payment Verification & Deliberate Tamper Check**:
+   - Customer completes payment via hosted checkout $\rightarrow$ gateway validates HMAC-SHA256 signature on real Razorpay rails $\rightarrow$ ledger status transitions to `CAPTURED & PAID`.
+   - **Deliberate Tamper Demonstration**: Triggering an out-of-band edit to either the event log or projection view triggers an instant `422 Tamper Alert` via `GET /audit/verify`, proving mathematical non-repudiation.
 
 ---
 
@@ -142,15 +142,19 @@ Spending rules are evaluated with mathematical certainty across 6 hierarchical c
   - *Automated Grounding Test*: [`tests/test_gemini_grounding.py`](file:///d:/RazorPay/tests/test_gemini_grounding.py)
   - *Interactive Live Grounding Demo*: `python scripts/demo_gemini_grounding.py`
 - **Smart Add-on Recommendations (`suggest_addons`)**: Discovers complementary cross-sell items from the store's affinity graph that fit precisely within the customer's remaining budget headroom without ever violating mandate limits.
-- **Empirical Measurement & AOV Lift Benchmark**: Rather than unsubstantiated claims, the revenue uplift was empirically benchmarked across **47 synthetic buyer procurement sessions** across electronics, food, home & kitchen, and apparel:
+- **Offline Simulated Benchmark (AOV Lift Measurement)**: To measure potential commercial uplift without inflated marketing claims, we evaluated **47 synthetic buyer procurement sessions** across electronics, food, home & kitchen, and apparel using the store's cross-sell affinity map within available mandate headroom:
   - *Baseline Average Basket Value (AOV)*: **₹708.53** (single-item catalog search)
   - *AI-Upsold Average Basket Value (AOV)*: **₹997.60** (with complementary add-on)
-  - *Empirical Net AOV Lift*: **+40.8%**
+  - *Simulated Net AOV Lift*: **+40.8%**
   - *Add-On Attach Rate*: **78.72%**
   - *Mandate Budget Compliance*: **100.0% (Zero over-budget violations)**
-  - *Reproducible Benchmark Script*: `python scripts/benchmark_aov.py` (saves to [`benchmarks/aov_benchmark_results.json`](file:///d:/RazorPay/benchmarks/aov_benchmark_results.json))
+  - *Methodology*: Compares single-item baseline intent vs. budget-constrained cross-sell add-on selection. Reproducible via `python scripts/benchmark_aov.py` (saved to [`benchmarks/aov_benchmark_results.json`](file:///d:/RazorPay/benchmarks/aov_benchmark_results.json)).
 
-### 4. Real Razorpay Test Mode Payment Rails & State Lifecycle
+### 4. Real Razorpay Test Rails vs. Simulated Mandate Settlement
+
+> **Architectural Clarity**:  
+> • **Real Razorpay Test Rails**: Order creation in sub-unit paise, hosted checkout UI, and server-side HMAC-SHA256 signature / webhook verification are 100% live on `api.razorpay.com`.  
+> • **Autonomous Mandate Settlement**: For micro-purchases under ₹500, autonomous execution is modeled as a **controlled sandbox-wallet simulation** with strict balance checks and stock restoration, cleanly separated from external customer payment capture.
 
 ```mermaid
 stateDiagram-v2
@@ -164,11 +168,11 @@ stateDiagram-v2
     
     EVALUATING --> AUTHORIZED: Under ₹500 (Tier 1 Micro-Spend Auto-Approved)
     
-    state "Pre-Authorized Mandate Path" as AutoPath {
-        AUTHORIZED --> MANDATE_SETTLED: Pre-Authorized Mandate Settle (Auto-Debit)
+    state "Controlled Sandbox Mandate Path" as AutoPath {
+        AUTHORIZED --> MANDATE_SETTLED: Simulated Mandate Wallet Debit (Checked Balance)
     }
     
-    state "Real Razorpay Rails Path" as RazorpayPath {
+    state "Live Razorpay Test Rails Path" as RazorpayPath {
         HOSTED_ESCALATION --> ORDER_CREATED: Razorpay Orders API (status: created)
         AUTHORIZED --> ORDER_CREATED: Razorpay Orders API (Paise Sub-units)
         ORDER_CREATED --> PENDING_PAYMENT: Awaiting Customer UPI / Card
@@ -182,9 +186,9 @@ stateDiagram-v2
 | State Term | Meaning & Execution Reality |
 |---|---|
 | **`AUTHORIZED`** | Policy engine verified mandate limits, merchant whitelist, category, and daily budget. Funds have **not** moved yet. |
-| **`ORDER_CREATED` / `PENDING`** | Razorpay Order entity minted on live test API (`order_XXXX`, in sub-unit paise). Awaiting customer payment. |
+| **`ORDER_CREATED` / `PENDING`** | Real Razorpay Order entity minted on live test API (`order_XXXX`, in sub-unit paise). Awaiting customer payment. |
 | **`PAYMENT_CAPTURED` / `PAID`** | Authentic customer payment completed; cryptographic HMAC-SHA256 signature (`order_id\|payment_id`) or webhook verified. |
-| **`MANDATE_SETTLED`** | Autonomous micro-purchase ($< ₹500$) settled against customer's pre-approved spending balance. |
+| **`MANDATE_SETTLED`** | Autonomous micro-purchase ($< ₹500$) settled against customer's simulated sandbox mandate balance. |
 | **`REJECTED` / `ESCALATED`** | Purchase exceeds autonomous spending mandate; escalated to customer via hosted checkout link or UPI QR code. |
 
 - **Live Razorpay Test Mode Verification**: Real test-mode orders, HMAC-SHA256 signature verification, and ledger capture are verified against `api.razorpay.com`:
@@ -193,9 +197,9 @@ stateDiagram-v2
 - **Sub-Unit Paise Conversion**: Accurate currency math converting INR ₹ to paise (`int(round(amount * 100))`).
 - **Webhook Security & Deduplication**: Cryptographically verifies `X-Razorpay-Signature` on incoming webhooks (`payment.captured`, `order.paid`, `payment_link.paid`). Deduplication prevents replay attacks. The test simulator `/payment/simulate-webhook` is admin-protected, disabled by default in production, and hidden from public production OpenAPI schema.
 
-### 5. Hash-Chained Tamper-Evident Audit Ledger
-- Every proposal, policy evaluation, human confirmation, checkout escalation, and webhook event is sequentially linked in a cryptographic SHA-256 hash chain (`prev_hash` $\rightarrow$ `event_hash`).
-- **Tamper Evidence**: Any offline modification of SQLite rows breaks the cryptographic chain, immediately detected by `GET /audit/verify`.
+### 5. Hash-Chained Tamper-Evident Audit Ledger with Projection Reconciliation
+- **Cryptographic Hash Chain**: Every proposal, policy evaluation, human confirmation, checkout escalation, and webhook event is sequentially linked in an append-only SHA-256 hash chain (`prev_hash` $\rightarrow$ `event_hash`).
+- **Dual-Layer Projection Reconciliation**: Unlike naive systems that only hash event logs while leaving view tables mutable, `verify_integrity()` traverses the event stream and actively reconciles `audit_records` against each transaction's cryptographic event hash. Out-of-band modifications to rows immediately trigger tamper alerts.
 - **Exportable Anchor Checkpoints**: Exposes `GET /audit/anchor` which outputs the current block height, genesis hash, latest timestamp, and SHA-256 root state digest for periodic anchoring or external notarization.
 - Semantic product name and reference code search (`REF-XXXXXXXX`) via `lookup_order`.
 

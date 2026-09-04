@@ -415,9 +415,44 @@ class AuditStore:
 
                     expected_prev = ev_h or expected_hash
 
+                # 2. Reconcile mutable projection view (audit_records) against append-only audit_events
+                cursor.execute(
+                    """
+                    SELECT transaction_id, record_hash
+                    FROM audit_records;
+                    """
+                )
+                projection_rows = cursor.fetchall()
+                
+                # Map transaction_id -> latest event hash
+                latest_event_hashes_by_tx: Dict[str, str] = {}
+                for r in event_rows:
+                    tx = r[2]  # transaction_id
+                    ev_h = r[7]  # event_hash
+                    latest_event_hashes_by_tx[tx] = ev_h
+
+                for p_tx, p_rec_hash in projection_rows:
+                    if p_tx not in latest_event_hashes_by_tx:
+                        return {
+                            "valid": False,
+                            "error": f"Orphaned projection record found: transaction '{p_tx}' exists in projection but missing in cryptographic event stream.",
+                            "broken_record_id": p_tx,
+                        }
+                    latest_hash = latest_event_hashes_by_tx[p_tx]
+                    if p_rec_hash and p_rec_hash != latest_hash:
+                        return {
+                            "valid": False,
+                            "error": f"Projection tampering detected on transaction '{p_tx}': projection record_hash does not match cryptographic event stream hash.",
+                            "broken_record_id": p_tx,
+                            "projection_hash": p_rec_hash,
+                            "event_stream_hash": latest_hash,
+                        }
+
                 return {
                     "valid": True,
                     "total_records": len(event_rows),
+                    "total_projections_reconciled": len(projection_rows),
+                    "reconciled": True,
                     "status": "VERIFIED_IMMUTABLE",
                     "chain_head": expected_prev,
                 }
