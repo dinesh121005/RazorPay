@@ -6,6 +6,7 @@ from typing import Any, Dict, Generator, Optional, Tuple
 DEMO_WALLET_BALANCES: Dict[str, float] = {
     "CUST001": 5000.0,
     "CUST002": 3000.0,
+    "ai-buyer": 5000.0,
 }
 
 

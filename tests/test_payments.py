@@ -386,7 +386,8 @@ def test_webhook_payment_captured_valid_signature():
     import hashlib
     import json
 
-    secret = "dev-webhook-secret"
+    from app.payment.router import get_webhook_secret
+    secret = get_webhook_secret()
     payload_dict = {
         "event": "payment.captured",
         "payload": {
@@ -454,7 +455,8 @@ def test_webhook_duplicate_event_deduplication():
     import hashlib
     import json
 
-    secret = "dev-webhook-secret"
+    from app.payment.router import get_webhook_secret
+    secret = get_webhook_secret()
     payload_dict = {
         "event_id": "evt_dedup_test_999",
         "event": "payment.captured",
@@ -516,7 +518,8 @@ def test_webhook_payment_failed_restores_inventory():
     from app.catalog.service import get_product
     from app.audit import audit_store
 
-    secret = "dev-webhook-secret"
+    from app.payment.router import get_webhook_secret
+    secret = get_webhook_secret()
     prod = get_product("HK001")
     initial_stock = prod.stock
 
@@ -576,7 +579,8 @@ def test_persistent_database_webhook_deduplication():
     Verifies that webhook event deduplication is persisted in the database,
     returning 200 OK with deduplicated: True even across fresh memory state.
     """
-    secret = "dev-webhook-secret"
+    from app.payment.router import get_webhook_secret
+    secret = get_webhook_secret()
     event_id = "evt_persistent_dedup_999"
 
     # Pre-record event in audit store
@@ -656,7 +660,8 @@ def test_payment_link_paid_webhook_updates_ledger():
         idempotency_key="idemp-plink-123",
     )
 
-    secret = "dev-webhook-secret"
+    from app.payment.router import get_webhook_secret
+    secret = get_webhook_secret()
     payload_dict = {
         "event": "payment_link.paid",
         "payload": {

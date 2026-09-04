@@ -31,6 +31,18 @@ DEMO_MANDATES: Dict[str, Mandate] = {
         expires_at=None,
         prompt_playback="Pre-authorized spending up to ₹1,500 for electronics and home & kitchen from MERCH_ELEC only."
     ),
+    "ai-buyer": Mandate(
+        customer_id="ai-buyer",
+        display_name="AI Buyer Autonomous Vault",
+        email="ai-buyer@agentic-commerce.internal",
+        max_transaction_amount=2000.0,
+        daily_limit=5000.0,
+        currency="INR",
+        allowed_categories=["electronics", "home_kitchen", "apparel", "food"],
+        allowed_merchants=["MERCH_ELEC", "MERCH_FOOD"],
+        expires_at=None,
+        prompt_playback="Pre-authorized AI Buyer Vault with ₹2,000 transaction limit for food, electronics, apparel, and kitchen essentials."
+    ),
 }
 
 
