@@ -50,11 +50,11 @@ def list_audit_records(
     "/verify",
     status_code=status.HTTP_200_OK,
     summary="Cryptographic SHA-256 Audit Chain Verification",
-    description="Walks the full audit ledger, verifying mathematical SHA-256 hash chaining and tamper-free immutability."
+    description="Walks the full audit ledger, verifying mathematical SHA-256 hash chaining over tamper-evident audit events.",
 )
 def verify_audit_ledger() -> dict:
     """
-    Cryptographic verification endpoint traversing and validating the immutable hash chain.
+    Cryptographic verification endpoint traversing and validating the tamper-evident event hash chain.
     """
     return audit_store.verify_integrity()
 

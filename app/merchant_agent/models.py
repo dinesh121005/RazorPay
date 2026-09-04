@@ -38,6 +38,8 @@ class InquiryResponse(BaseModel):
     quotes: List[ProductQuote] = Field(default_factory=list, description="List of matched product quotes ranked by relevance")
     merchant_notes: str = Field(..., description="Summary message and recommendation from the Merchant Sales Agent")
     total_matches: int = Field(..., description="Number of matching products found")
+    llm_reasoning_used: bool = Field(default=False, description="Whether live LLM reasoning (Gemini/OpenAI) generated this quote")
+    llm_engine: Optional[str] = Field(default="Local Grounded Semantic Knowledge Graph", description="Active AI reasoning engine label")
 
 
 class AddOnRecommendationRequest(BaseModel):

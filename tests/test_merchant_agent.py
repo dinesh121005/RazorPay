@@ -195,7 +195,7 @@ def test_merchant_agent_llm_reasoning_pipeline():
         ],
     }
 
-    with patch("app.merchant_agent.service.call_llm_merchant_reasoning", return_value=mock_llm_quote):
+    with patch("app.merchant_agent.service.call_llm_merchant_reasoning", return_value=mock_llm_quote), patch("app.merchant_agent.llm.call_llm_merchant_reasoning", return_value=mock_llm_quote):
         req = InquiryRequest(query="i want keyboard")
         res = merchant_agent_service.process_inquiry(req)
 
@@ -239,7 +239,7 @@ def test_merchant_agent_llm_quote_grounding_interceptor():
         ],
     }
 
-    with patch("app.merchant_agent.service.call_llm_merchant_reasoning", return_value=hallucinated_quote):
+    with patch("app.merchant_agent.service.call_llm_merchant_reasoning", return_value=hallucinated_quote), patch("app.merchant_agent.llm.call_llm_merchant_reasoning", return_value=hallucinated_quote):
         req = InquiryRequest(query="i want keyboard")
         res = merchant_agent_service.process_inquiry(req)
 

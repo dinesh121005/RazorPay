@@ -1,8 +1,9 @@
 """
 SQLite persistence layer for the audit trail with SHA-256 cryptographic hash chaining.
 
-Provides a tamper-evident, queryable audit log storing every proposal evaluated by the gateway,
-its policy decision verdict, downstream payment execution status, and verifiable cryptographic hash chain.
+Architectural Design: Append-Only Event Ledger (`audit_events`) with a Queryable Current-State Projection (`audit_records`).
+Every proposal evaluation and payment status transition appends an immutable block to the SHA-256 hash-chained event log,
+while updating the relational projection view for fast querying.
 """
 import contextlib
 from datetime import datetime, timezone
@@ -273,7 +274,8 @@ class AuditStore:
         razorpay_order_id: Optional[str] = None,
     ) -> None:
         """
-        Phase B: Append an immutable payment/confirmation event to the ledger and update record view.
+        Phase B: Append an immutable event to the append-only `audit_events` ledger
+        and update the mutable `audit_records` projection view (CQRS / Event-Sourcing pattern).
         """
         self._ensure_db_initialized()
         with self._get_connection() as conn:

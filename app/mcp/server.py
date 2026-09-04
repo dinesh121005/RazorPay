@@ -186,11 +186,20 @@ from mcp.server.transport_security import TransportSecuritySettings
 # Remote MCP Server Singleton & Streamable App
 remote_mcp_server = create_remote_mcp_server()
 _transport_sec = TransportSecuritySettings(enable_dns_rebinding_protection=False)
-_streamable_asgi = remote_mcp_server.streamable_http_app(
-    streamable_http_path="/",
-    transport_security=_transport_sec,
-    stateless_http=True,
-)
+try:
+    _streamable_asgi = remote_mcp_server.streamable_http_app(
+        streamable_http_path="/",
+        transport_security=_transport_sec,
+        stateless_http=True,
+    )
+except TypeError:
+    try:
+        _streamable_asgi = remote_mcp_server.streamable_http_app(
+            transport_security=_transport_sec,
+            stateless_http=True,
+        )
+    except TypeError:
+        _streamable_asgi = remote_mcp_server.streamable_http_app()
 
 
 @asynccontextmanager

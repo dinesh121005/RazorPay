@@ -296,13 +296,15 @@ async def test_mcp_server_call_search_products_async():
     Executes search_products tool via asynchronous MCP protocol call_tool method.
     """
     server = create_mcp_server()
-    result = await server.call_tool(
+    res = await server.call_tool(
         name="search_products",
         arguments={"query": "keyboard"},
     )
-    assert result.is_error is False
-    assert len(result.content) >= 1
-    items = [json.loads(c.text) for c in result.content]
+    content = res[0] if isinstance(res, tuple) else res.content
+    is_err = getattr(res, "is_error", False)
+    assert is_err is False
+    assert len(content) >= 1
+    items = [json.loads(c.text) for c in content]
     assert len(items) == 1
     assert items[0]["id"] == "KB001"
     assert "Keyboard" in items[0]["name"]
@@ -317,14 +319,15 @@ async def test_mcp_server_call_tool_async_approved():
 
     # Step 1: Propose (returns PENDING_CONFIRMATION for >= ₹500)
     with patch(_CREATE_ORDER):
-        result = await server.call_tool(
+        res1 = await server.call_tool(
             name="propose_purchase",
             arguments={"customer_id": "CUST001", "product_id": "KB001", "quantity": 1},
         )
 
-    assert result.is_error is False
-    assert len(result.content) == 1
-    data = json.loads(result.content[0].text)
+    content1 = res1[0] if isinstance(res1, tuple) else res1.content
+    assert getattr(res1, "is_error", False) is False
+    assert len(content1) == 1
+    data = json.loads(content1[0].text)
 
     assert data["decision"] == "PENDING_CONFIRMATION"
     assert data["requires_confirmation"] is True
@@ -332,13 +335,14 @@ async def test_mcp_server_call_tool_async_approved():
 
     # Step 2: Confirm
     with patch(_CREATE_ORDER, return_value=_FAKE_ORDER):
-        conf_result = await server.call_tool(
+        res2 = await server.call_tool(
             name="confirm_purchase",
             arguments={"customer_id": "CUST001", "confirmation_token": token},
         )
 
-    assert conf_result.is_error is False
-    conf_data = json.loads(conf_result.content[0].text)
+    content2 = res2[0] if isinstance(res2, tuple) else res2.content
+    assert getattr(res2, "is_error", False) is False
+    conf_data = json.loads(content2[0].text)
     assert conf_data["decision"] == "APPROVED"
     assert conf_data["product_name"] == "Mechanical Gaming Keyboard"
     assert conf_data["amount"] == 1499.0
@@ -353,14 +357,15 @@ async def test_mcp_server_call_tool_async_rejected():
     server = create_mcp_server()
 
     with patch(_CREATE_ORDER) as mock_create:
-        result = await server.call_tool(
+        res = await server.call_tool(
             name="propose_purchase",
             arguments={"customer_id": "CUST001", "product_id": "MN001", "quantity": 1},
         )
 
     mock_create.assert_not_called()
-    assert result.is_error is False
-    data = json.loads(result.content[0].text)
+    content = res[0] if isinstance(res, tuple) else res.content
+    assert getattr(res, "is_error", False) is False
+    data = json.loads(content[0].text)
     assert data["decision"] == "REJECTED"
     assert data["product_name"] == "27-inch 4K UHD Monitor"
     assert data["reference_code"] is None
@@ -601,13 +606,14 @@ async def test_mcp_server_call_resolve_customer_async():
     Executes resolve_customer tool via asynchronous MCP protocol call_tool method.
     """
     server = create_mcp_server()
-    result = await server.call_tool(
+    res = await server.call_tool(
         name="resolve_customer",
         arguments={"identifier": "Dinesh Kumar"},
     )
-    assert result.is_error is False
-    assert len(result.content) == 1
-    data = json.loads(result.content[0].text)
+    content = res[0] if isinstance(res, tuple) else res.content
+    assert getattr(res, "is_error", False) is False
+    assert len(content) == 1
+    data = json.loads(content[0].text)
     assert data["resolved"] is True
     assert data["customer_id"] == "CUST001"
     assert data["display_name"] == "Dinesh Kumar"

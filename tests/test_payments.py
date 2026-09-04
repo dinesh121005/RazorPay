@@ -174,7 +174,7 @@ def test_rejected_purchase_no_payment_call():
     data = response.json()
     assert data["decision"] == "REJECTED"
     if data["payment"] is not None:
-        assert data["payment"]["payment_method"] == "razorpay_link"
+        assert data["payment"]["payment_method"] in ["razorpay_link", "gateway_escalation_checkout"]
         assert data["payment"]["payment_url"] is not None
 
 

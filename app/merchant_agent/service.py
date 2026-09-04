@@ -5,7 +5,11 @@ Analyzes natural language procurement inquiries from Buyer AI Agents (e.g. Claud
 reasons over private merchant catalog & stock using real Generative LLMs (or local semantic engine),
 and formulates structured, transparent quotes.
 """
+import logging
+import os
 from typing import Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from app.catalog.data import PRODUCTS
 from app.catalog.models import Product
@@ -129,13 +133,17 @@ class MerchantAgentService:
                         "merchant_notes",
                         "Merchant Agent Quote formulated via LLM reasoning grounded in live catalog.",
                     )
+                    engine_label = "Google Gemini 2.5 Flash Autonomous Reasoning" if os.getenv("GEMINI_API_KEY") else "OpenAI GPT-4o-mini Reasoning"
                     return InquiryResponse(
                         best_match_product_id=best_id,
                         quotes=validated_quotes,
                         merchant_notes=notes,
                         total_matches=len(validated_quotes),
+                        llm_reasoning_used=True,
+                        llm_engine=engine_label,
                     )
-            except Exception:
+            except Exception as exc:
+                logger.warning(f"Failed to validate LLM reasoning quote: {exc}")
                 pass  # Fall through to deterministic semantic analysis on parsing error
 
         # 2. Local Semantic Reasoning Engine (Offline / Unit Test fallback)
@@ -215,6 +223,8 @@ class MerchantAgentService:
             quotes=final_quotes,
             merchant_notes=notes,
             total_matches=len(final_quotes),
+            llm_reasoning_used=False,
+            llm_engine="Local Grounded Semantic Knowledge Graph",
         )
 
     def recommend_addons(

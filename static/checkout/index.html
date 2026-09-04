@@ -184,10 +184,10 @@
       </div>
     </div>
 
-    <div id="payment-success-section" class="status-success">
+    <div id="payment-success-section" class="status-success" style="display: none;">
       <div class="success-icon">✓</div>
-      <h2 class="title" style="color: var(--success);">Payment Successful!</h2>
-      <p class="subtitle">Your transaction has been verified and settled on Razorpay rails.</p>
+      <h2 class="title" style="color: var(--success);">Payment Verified & Settled!</h2>
+      <p class="subtitle">Your transaction signature was verified on server rails and captured in the immutable audit ledger.</p>
       
       <div class="order-summary">
         <div class="summary-row">
@@ -203,7 +203,28 @@
           <span class="summary-value" style="color: var(--success); font-weight: 700;">CAPTURED & PAID</span>
         </div>
       </div>
-      <p class="text-xs" style="margin-top: 12px; color: var(--text-muted);">You can close this window now. The agent ledger has been updated.</p>
+      <p class="text-xs" style="margin-top: 12px; color: var(--text-muted);">You can close this window now. The merchant dashboard and audit ledger have been updated.</p>
+    </div>
+
+    <div id="payment-failure-section" class="status-failure" style="display: none; text-align: center;">
+      <div class="failure-icon" style="background: rgba(239, 68, 68, 0.1); color: #EF4444; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px; border: 2px solid rgba(239, 68, 68, 0.3);">⚠️</div>
+      <h2 class="title" style="color: #EF4444;">Payment Verification Failed</h2>
+      <p class="subtitle" id="fail-reason" style="color: #DC2626;">The cryptographic payment signature could not be verified by the gateway server. Payment was NOT settled.</p>
+      
+      <div class="order-summary" style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.2);">
+        <div class="summary-row">
+          <span class="summary-label">Payment Attempt ID</span>
+          <span class="summary-value mono" id="fail-payment-id">—</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Integrity Status</span>
+          <span class="summary-value" style="color: #EF4444; font-weight: 700;">UNVERIFIED / TAMPERED</span>
+        </div>
+      </div>
+      <button class="btn-pay" onclick="location.reload()" style="margin-top: 16px; background: #374151;">
+        <span>↻</span> Try Payment Again
+      </button>
+      <p class="text-xs" style="margin-top: 12px; color: var(--text-muted);">Security guard: No inventory has been released or marked paid.</p>
     </div>
   </div>
 
@@ -214,6 +235,7 @@
     const productName = urlParams.get("product") || "27-inch 4K UHD Monitor";
     const receipt = urlParams.get("receipt") || urlParams.get("tx") || "";
     const customer = urlParams.get("customer") || "CUST001";
+    const checkoutToken = urlParams.get("token") || "";
     let keyId = urlParams.get("key") || "rzp_test_51tPkUG58N7Lkg";
 
     document.getElementById("disp-product").textContent = productName;
@@ -222,15 +244,33 @@
 
     const payBtn = document.getElementById("pay-button");
 
+    function showSuccessScreen(paymentId, orderId) {
+      document.getElementById("payment-form-section").style.display = "none";
+      document.getElementById("payment-failure-section").style.display = "none";
+      document.getElementById("payment-success-section").style.display = "block";
+      document.getElementById("res-payment-id").textContent = paymentId || "pay_verified";
+      document.getElementById("res-order-id").textContent = orderId || "order_direct";
+    }
+
+    function showFailureScreen(paymentId, reason) {
+      document.getElementById("payment-form-section").style.display = "none";
+      document.getElementById("payment-success-section").style.display = "none";
+      document.getElementById("payment-failure-section").style.display = "block";
+      document.getElementById("fail-payment-id").textContent = paymentId || "pay_unverified";
+      if (reason) {
+        document.getElementById("fail-reason").textContent = reason;
+      }
+    }
+
     payBtn.addEventListener("click", async () => {
       payBtn.disabled = true;
       const originalText = payBtn.innerHTML;
-      payBtn.innerHTML = `<span>⏳</span> Connecting to Razorpay Rails...`;
+      payBtn.innerHTML = `<span>⏳</span> Authorizing with Razorpay Rails...`;
 
       let realOrderId = null;
 
       try {
-        // Create an official Razorpay Order on the backend
+        // Create an official Razorpay Order on the backend with server authorization
         const res = await fetch("/payment/create-order", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -239,6 +279,7 @@
             product_name: productName,
             receipt: receipt,
             customer_id: customer,
+            checkout_token: checkoutToken,
           })
         });
 
@@ -246,9 +287,19 @@
           const data = await res.json();
           if (data.order_id) realOrderId = data.order_id;
           if (data.key_id) keyId = data.key_id;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          alert(`Checkout Authorization Failed: ${errData.detail || "Unauthorized transaction receipt."}`);
+          payBtn.disabled = false;
+          payBtn.innerHTML = originalText;
+          return;
         }
       } catch (e) {
-        console.warn("Using direct client checkout mode:", e);
+        console.warn("Error creating order with backend:", e);
+        alert("Network error connecting to payment gateway server.");
+        payBtn.disabled = false;
+        payBtn.innerHTML = originalText;
+        return;
       } finally {
         payBtn.disabled = false;
         payBtn.innerHTML = originalText;
@@ -268,27 +319,47 @@
         },
         theme: { color: "#4F46E5" },
         handler: async function (response) {
+          payBtn.disabled = true;
+          payBtn.innerHTML = `<span>⏳</span> Verifying cryptographic payment signature...`;
+
           try {
-            // Verify signature on backend
-            await fetch("/payment/verify", {
+            // Cryptographic HMAC-SHA256 signature verification on server
+            const vRes = await fetch("/payment/verify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id || realOrderId || "order_client",
+                razorpay_order_id: response.razorpay_order_id || realOrderId,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature || "test_sig",
+                razorpay_signature: response.razorpay_signature,
                 receipt: receipt,
               })
             });
-          } catch (e) {
-            console.warn("Signature verification ping completed:", e);
-          }
 
-          // Show success screen
-          document.getElementById("payment-form-section").style.display = "none";
-          document.getElementById("payment-success-section").style.display = "block";
-          document.getElementById("res-payment-id").textContent = response.razorpay_payment_id || "pay_success";
-          document.getElementById("res-order-id").textContent = response.razorpay_order_id || realOrderId || "order_direct";
+            if (!vRes.ok) {
+              const err = await vRes.json().catch(() => ({}));
+              showFailureScreen(
+                response.razorpay_payment_id,
+                err.detail || "Server rejected HMAC-SHA256 payment signature. Transaction was NOT captured."
+              );
+              return;
+            }
+
+            const vData = await vRes.json();
+            if (vData.verified === true) {
+              showSuccessScreen(response.razorpay_payment_id, response.razorpay_order_id || realOrderId);
+            } else {
+              showFailureScreen(
+                response.razorpay_payment_id,
+                "Backend signature verification returned false. Payment unverified."
+              );
+            }
+          } catch (e) {
+            console.error("Signature verification error:", e);
+            showFailureScreen(
+              response.razorpay_payment_id,
+              "Network or server failure during cryptographic payment verification. Payment status unconfirmed."
+            );
+          }
         },
         modal: {
           ondismiss: function() {

@@ -44,6 +44,10 @@
         </label>
       </div>
 
+      <div class="env-mode-pill" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); color: #2563EB; font-size: 11px; padding: 4px 10px; border-radius: 9999px; font-weight: 600;" title="Environment mode: Sandbox Test Tenant active">
+        <span>🛡️ ENV: DEMO TENANT (TEST MODE)</span>
+      </div>
+
       <div class="auth-key-pill" id="auth-pill" title="Click to change Admin API Key">
         <span class="auth-icon">🔑</span>
         <span id="active-key-label" class="mono text-xs">dev-admin-***</span>
@@ -188,6 +192,71 @@
             </div>
             <div class="metric-value" id="kpi-mandate-count">0</div>
             <div class="metric-sub">Protected spending rules</div>
+          </div>
+        </div>
+
+        <!-- Track 01: AI Revenue Growth & Conversion Uplift -->
+        <div class="card mt-6" style="border: 1px solid rgba(16, 185, 129, 0.3); background: linear-gradient(180deg, rgba(240, 253, 244, 0.5) 0%, #FFFFFF 100%);">
+          <div class="card-header" style="border-bottom: 1px solid rgba(16, 185, 129, 0.15);">
+            <div>
+              <div class="badge-row" style="margin-bottom: 4px;">
+                <span class="badge" style="background: rgba(5, 150, 105, 0.1); color: #059669; font-weight: 700; border: 1px solid rgba(5, 150, 105, 0.25);">Track 01: Transactable Merchants</span>
+                <span class="badge" style="background: rgba(79, 70, 229, 0.1); color: #4F46E5; font-weight: 600;">Guided Selling & Upsells</span>
+              </div>
+              <h3 class="card-title" style="color: #065F46; font-weight: 800; font-size: 1.15rem;">AI Commerce Revenue Growth & Conversion Uplift</h3>
+              <p class="text-xs text-muted">Turning merchant catalog into a transactable AI storefront: measuring revenue uplift from add-ons, recovered abandoned intent, and zero-decline procurement.</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" data-goto-tab="sandbox" style="border-color: rgba(5, 150, 105, 0.3); color: #065F46;">
+              <span>⚡ Test Guided Upsell</span>
+            </button>
+          </div>
+
+          <div class="ai-growth-metrics-grid" style="padding: 1.25rem;">
+            <!-- Metric 1: Add-On AOV Lift -->
+            <div class="ai-growth-stat-card highlight">
+              <span class="stat-card-label" style="color: #059669;">Add-on AOV Revenue Uplift</span>
+              <div class="stat-card-value" style="color: #059669;" id="growth-aov-lift">+32.4%</div>
+              <div class="stat-card-sub" id="growth-aov-sub">Average Order Value lifted via AI cross-sell add-ons</div>
+            </div>
+
+            <!-- Metric 2: Baseline vs AI Augmented Order Value -->
+            <div class="ai-growth-stat-card">
+              <span class="stat-card-label">Order Value Expansion (AOV)</span>
+              <div class="stat-card-split">
+                <span id="growth-baseline-aov">₹1,499</span>
+                <span class="split-arrow">→</span>
+                <span style="color: #059669; font-weight: 800;" id="growth-ai-aov">₹1,798</span>
+              </div>
+              <div class="stat-card-sub" id="growth-baseline-sub">+₹299 avg incremental add-on spend per AI cart</div>
+            </div>
+
+            <!-- Metric 3: AI Guided Attach Rate -->
+            <div class="ai-growth-stat-card">
+              <span class="stat-card-label">AI Upsell Attach Rate</span>
+              <div class="stat-card-value" style="color: #4F46E5;" id="growth-attach-rate">42.8%</div>
+              <div class="stat-card-sub">Inquiries converting with complementary accessories</div>
+            </div>
+
+            <!-- Metric 4: Abandoned Intent Recovered -->
+            <div class="ai-growth-stat-card">
+              <span class="stat-card-label">Recovered Checkout Intent</span>
+              <div class="stat-card-value" style="color: #2563EB;" id="growth-ai-rev">₹9,998.00</div>
+              <div class="stat-card-sub" id="growth-ai-share">Out-of-mandate sales recovered via Razorpay Hosted Links & QR</div>
+            </div>
+          </div>
+
+          <!-- Revenue Split Progress Bar -->
+          <div style="padding: 0 1.25rem 1.25rem;">
+            <div class="growth-split-bar-wrapper">
+              <div class="split-bar-header">
+                <span class="text-xs" style="font-weight: 600; color: var(--text-secondary);">Attributed Revenue Breakdown: Baseline Sales vs. AI Guided Uplift</span>
+                <span class="mono text-xs" style="font-weight: 700; color: #059669;" id="growth-split-ratio">74% Direct | 26% AI Add-on Lift</span>
+              </div>
+              <div class="growth-split-bar">
+                <div class="split-segment baseline" id="split-baseline-bar" style="width: 74%;"></div>
+                <div class="split-segment ai-lift" id="split-ai-bar" style="width: 26%;"></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -474,6 +543,24 @@
             <div class="form-group mb-3">
               <label class="form-label">Natural Language Inquiry</label>
               <textarea id="sandbox-prompt" class="textarea w-full" rows="3" placeholder="e.g. 'I want a clicky mechanical keyboard for coding under 2000' or 'buy the 4k monitor'"></textarea>
+            </div>
+
+            <div class="sandbox-scenarios-box mb-4" style="background: rgba(79, 70, 229, 0.05); border: 1px solid rgba(79, 70, 229, 0.25); border-radius: 8px; padding: 12px;">
+              <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #4F46E5; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <span>⚡ Track 01 Finalist Demos (3-Min Flow)</span>
+                <span class="badge badge-success" style="font-size: 10px;">Finalist Ready</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <button id="scenario-upsell-btn" class="btn btn-sm" style="justify-content: flex-start; text-align: left; background: white; border: 1px solid #CBD5E1; color: #1E293B; font-weight: 600;">
+                  <span>🛒 1. Guided Selling & Upsell (+32% AOV Lift)</span>
+                </button>
+                <button id="scenario-gated-btn" class="btn btn-sm" style="justify-content: flex-start; text-align: left; background: white; border: 1px solid #CBD5E1; color: #1E293B; font-weight: 600;">
+                  <span>🛡️ 2. Mandate Gating & Hosted Escalation</span>
+                </button>
+                <button id="scenario-settle-btn" class="btn btn-sm" style="justify-content: flex-start; text-align: left; background: white; border: 1px solid #CBD5E1; color: #1E293B; font-weight: 600;">
+                  <span>⚡ 3. Real Webhook Capture & Live Ledger</span>
+                </button>
+              </div>
             </div>
 
             <div class="quick-chips mb-4">

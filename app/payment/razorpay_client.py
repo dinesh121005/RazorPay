@@ -104,13 +104,24 @@ def verify_payment_signature(razorpay_order_id: str, razorpay_payment_id: str, r
     """
     Verifies Razorpay client-side payment signature for checkout verification.
     """
-    client = get_client()
-    try:
-        client.utility.verify_payment_signature({
-            "razorpay_order_id": razorpay_order_id,
-            "razorpay_payment_id": razorpay_payment_id,
-            "razorpay_signature": razorpay_signature,
-        })
-        return True
-    except Exception:
-        return False
+    import hashlib
+    import hmac
+
+    # Try SDK verification first if client is available
+    if razorpay is not None:
+        try:
+            client = get_client()
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": razorpay_payment_id,
+                "razorpay_signature": razorpay_signature,
+            })
+            return True
+        except Exception:
+            pass
+
+    # Fallback / Direct HMAC-SHA256 signature verification
+    key_secret = os.environ.get("RAZORPAY_KEY_SECRET", "dev-razorpay-secret")
+    msg = f"{razorpay_order_id}|{razorpay_payment_id}".encode("utf-8")
+    expected = hmac.new(key_secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, razorpay_signature)
