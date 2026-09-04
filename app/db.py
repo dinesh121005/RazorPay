@@ -79,6 +79,10 @@ class PostgresCursorWrapper:
     def rowcount(self) -> int:
         return self._cursor.rowcount
 
+    @property
+    def description(self) -> Any:
+        return self._cursor.description
+
     def close(self) -> None:
         self._cursor.close()
 

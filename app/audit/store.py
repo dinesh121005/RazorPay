@@ -124,11 +124,15 @@ class AuditStore:
             cursor.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_idempotency_key ON audit_records(idempotency_key);"
             )
-            try:
-                cursor.execute("ALTER TABLE audit_records ADD COLUMN razorpay_payment_id TEXT;")
-                conn.commit()
-            except Exception:
-                pass
+            # Safe migration: check existing columns before running ALTER TABLE
+            cursor.execute("SELECT * FROM audit_records LIMIT 0;")
+            existing_cols = [desc[0].lower() for desc in (cursor.description or [])]
+            if "razorpay_payment_id" not in existing_cols:
+                try:
+                    cursor.execute("ALTER TABLE audit_records ADD COLUMN razorpay_payment_id TEXT;")
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
 
             # Append-only cryptographic ledger
             cursor.execute(
