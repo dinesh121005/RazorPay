@@ -2,7 +2,7 @@ import base64
 import html
 import json
 import os
-from typing import Optional
+from typing import Any, List, Optional
 from urllib.parse import urlencode
 
 import httpx
