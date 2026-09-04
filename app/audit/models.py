@@ -78,7 +78,7 @@ class AuditRecord(BaseModel):
 
 class AuditEvent(BaseModel):
     """
-    Append-only immutable event block in the cryptographic SHA-256 hash chain.
+    Append-only tamper-evident event block in the cryptographic SHA-256 hash chain.
     Guarantees non-repudiation and tamper evidence across all transaction lifecycle events.
     """
     id: Optional[int] = Field(default=None, description="Sequential auto-incrementing ledger position")

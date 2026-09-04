@@ -1890,7 +1890,7 @@ class AdminDashboard {
       this.sandboxConsole.innerHTML += `
         <div class="trace-step success mt-2" style="border: 2px solid #10B981; background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 12px;">
           <div class="trace-step-header" style="color: #065F46; font-weight: 700;">🔐 Step 5: Cryptographic Dual-Layer Audit Verification</div>
-          <div class="font-bold text-success">Status: ${auditData.valid ? 'IMMUTABLE HASH CHAIN VERIFIED ✓' : 'VERIFICATION ALERT'}</div>
+          <div class="font-bold text-success">Status: ${auditData.valid ? 'HASH-CHAINED, TAMPER-EVIDENT LEDGER VERIFIED ✓' : 'VERIFICATION ALERT'}</div>
           <div class="text-xs mt-1">Total Cryptographic Events: <strong>${auditData.total_records || 0}</strong> | Chain Head: <span class="mono">${escapeHtml((auditData.chain_head || 'GENESIS').slice(0, 24))}...</span></div>
           <div class="text-xs mt-1 text-muted">Both append-only SHA-256 event stream and projection view are mathematically reconciled with zero tampering.</div>
         </div>

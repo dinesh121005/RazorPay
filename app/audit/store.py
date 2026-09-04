@@ -2,7 +2,7 @@
 SQLite persistence layer for the audit trail with SHA-256 cryptographic hash chaining.
 
 Architectural Design: Append-Only Event Ledger (`audit_events`) with a Queryable Current-State Projection (`audit_records`).
-Every proposal evaluation and payment status transition appends an immutable block to the SHA-256 hash-chained event log,
+Every proposal evaluation and payment status transition appends a tamper-evident block to the SHA-256 hash-chained event log,
 while updating the relational projection view for fast querying.
 """
 import contextlib
@@ -216,7 +216,7 @@ class AuditStore:
         timestamp: Optional[str] = None,
     ) -> Tuple[str, str]:
         """
-        Appends an immutable event block to the cryptographic ledger.
+        Appends a tamper-evident event block to the cryptographic ledger.
         Returns (event_hash, prev_hash).
         """
         if timestamp is None:
@@ -320,7 +320,7 @@ class AuditStore:
         razorpay_payment_id: Optional[str] = None,
     ) -> None:
         """
-        Phase B: Append an immutable event to the append-only `audit_events` ledger
+        Phase B: Append a tamper-evident event to the append-only `audit_events` ledger
         and update the mutable `audit_records` projection view (CQRS / Event-Sourcing pattern).
         """
         self._ensure_db_initialized()

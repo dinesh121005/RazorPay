@@ -303,7 +303,7 @@ def test_interleaved_transactions_maintain_cryptographic_integrity(tmp_path):
     # 5. Verify integrity of ledger
     res = store.verify_integrity()
     assert res["valid"] is True
-    assert res["total_records"] == 4  # 4 immutable events: Prop A, Prop B, Conf A, Conf B
+    assert res["total_records"] == 4  # 4 tamper-evident events: Prop A, Prop B, Conf A, Conf B
     assert res["status"] == "VERIFIED_IMMUTABLE"
 
 

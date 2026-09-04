@@ -1,7 +1,7 @@
 # 🌐 Agentic Commerce Gateway
 
 > **Track 01: AI Growth & Transactable Merchants**  
-> *Turning Merchant Catalogs into Trusted, Transactable AI-Buyable Storefronts with Grounded Sales & Intelligent Upsells (+40.8% Empirical AOV Lift), Deterministic Policy Mandates, Three-Tier Human Confirmation Gating, Server-Authorized Razorpay Payment Rails, and a Hash-Chained Tamper-Evident Audit Ledger.*
+> *Turning Merchant Catalogs into Trusted, Transactable AI-Buyable Storefronts with Grounded Sales & Intelligent Upsells (+40.8% Empirical AOV Lift), Deterministic Policy Mandates, Three-Tier Human Confirmation Gating, Server-Authorized Razorpay Payment Rails, and a Hash-Chained, Tamper-Evident Audit Ledger with Exportable Anchors.*
 
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
@@ -37,9 +37,10 @@ python scripts/demo_3min_buyer_journey.py
 2. **Step 2 — Dynamic Headroom Add-On Reasoning**: Merchant Growth AI (`POST /merchant/recommend-addons`) reasons over catalog synergy and remaining budget headroom (₹501). Recommends `FD007` (Kumbakonam Filter Coffee, ₹420) with exact headroom preservation (₹81 buffer saved, **+42.0% AOV Lift**).
 3. **Step 3 — Deterministic Mandate Policy Gate**: Buyer AI proposes purchase (`POST /agent/purchase`) authenticated via OAuth 2.1 token. Policy engine evaluates spending limits deterministically (auto-debit for approved micro-spend vs. single-use JWT human confirmation).
 4. **Step 4 — Honest Payment Execution & Escalation**:
-   - **Autonomous Micro-Spend**: Settled via customer simulated mandate balance (honest sandbox settlement).
+   - **Razorpay test-mode order/payment verification is live; autonomous mandate settlement is demonstrated through a controlled sandbox wallet.**
    - **Out-of-Mandate Escalation**: High-value purchase (e.g. 4K Monitor @ ₹4,999) exceeding mandate cap escalates to real **Razorpay Test-Mode Hosted Checkout** (`order_*`) with live checkout link and QR code.
-5. **Step 5 — Cryptographic Dual-Layer Audit Verification**: `GET /audit/verify` traverses the SHA-256 event chain and reconciles the projection view with zero tampering.
+5. **Step 5 — Cryptographic Dual-Layer Audit Verification**: `GET /audit/verify` traverses the hash-chained, tamper-evident audit ledger with exportable anchors and reconciles the projection view with zero tampering.
+
 
 
 ---
@@ -71,9 +72,10 @@ However, granting an AI agent direct access to credit cards or unconstrained mer
 2. **Unilateral Authorization**: An AI agent should propose purchases; high-value transactions must be gated behind explicit human authorization.
 3. **Dead-End Rejections**: When an item exceeds an autonomous allowance, traditional gateways simply throw an error rather than escalating to a secure human payment method.
 4. **Data Leakage**: Exposing private merchant database credentials or raw APIs to client-side agents breaks security perimeters.
-5. **Audit Deficits**: Probabilistic AI actions require an immutable, tamper-evident audit ledger for financial compliance.
+5. **Audit Deficits**: Probabilistic AI actions require a hash-chained, tamper-evident audit ledger with exportable anchors for financial compliance.
 
 ### The Solution: Agentic Commerce Gateway
+
 The **Agentic Commerce Gateway** is a zero-trust merchant-side control plane between Buyer AI Agents, Merchant Sales AI, and Razorpay Payment Rails:
 
 ```mermaid
@@ -156,9 +158,10 @@ Spending rules are evaluated with mathematical certainty across 6 hierarchical c
 
 ### 4. Real Razorpay Test Rails vs. Simulated Mandate Settlement
 
-> **Architectural Clarity**:  
-> • **Real Razorpay Test Rails**: Order creation in sub-unit paise, hosted checkout UI, and server-side HMAC-SHA256 signature / webhook verification are 100% live on `api.razorpay.com`.  
-> • **Autonomous Mandate Settlement**: For micro-purchases under ₹500, autonomous execution is modeled as a **controlled sandbox-wallet simulation** with strict balance checks and stock restoration, cleanly separated from external customer payment capture.
+> **Architectural Reality**:  
+> **Razorpay test-mode order/payment verification is live; autonomous mandate settlement is demonstrated through a controlled sandbox wallet.**  
+> • **Live Razorpay Test Rails**: Order creation in sub-unit paise, hosted checkout UI, and server-side HMAC-SHA256 signature / webhook verification are 100% live on `api.razorpay.com`.  
+> • **Autonomous Mandate Settlement**: For micro-purchases under ₹500, autonomous execution is demonstrated through a **controlled sandbox wallet** with strict balance checks and stock restoration, cleanly separated from external customer payment capture.
 
 ```mermaid
 stateDiagram-v2
@@ -201,11 +204,12 @@ stateDiagram-v2
 - **Sub-Unit Paise Conversion**: Accurate currency math converting INR ₹ to paise (`int(round(amount * 100))`).
 - **Webhook Security & Deduplication**: Cryptographically verifies `X-Razorpay-Signature` on incoming webhooks (`payment.captured`, `order.paid`, `payment_link.paid`). Deduplication prevents replay attacks. The test simulator `/payment/simulate-webhook` is admin-protected, disabled by default in production, and hidden from public production OpenAPI schema.
 
-### 5. Hash-Chained Tamper-Evident Audit Ledger with Projection Reconciliation
+### 5. Hash-Chained, Tamper-Evident Audit Ledger with Exportable Anchors
 - **Cryptographic Hash Chain**: Every proposal, policy evaluation, human confirmation, checkout escalation, and webhook event is sequentially linked in an append-only SHA-256 hash chain (`prev_hash` $\rightarrow$ `event_hash`).
-- **Dual-Layer Projection Reconciliation**: Unlike naive systems that only hash event logs while leaving view tables mutable, `verify_integrity()` traverses the event stream and actively reconciles `audit_records` against each transaction's cryptographic event hash. Out-of-band modifications to rows immediately trigger tamper alerts.
+- **Dual-Layer Projection Reconciliation**: The SQLite hash chain is tamper-evident within our application threat model. While an actor with direct raw database access could rewrite mutable SQLite tables, our dual-layer reconciliation and exportable SHA-256 anchors (`GET /audit/anchor`) make any tampering immediately detectable.
 - **Exportable Anchor Checkpoints**: Exposes `GET /audit/anchor` which outputs the current block height, genesis hash, latest timestamp, and SHA-256 root state digest for periodic anchoring or external notarization.
 - Semantic product name and reference code search (`REF-XXXXXXXX`) via `lookup_order`.
+
 
 ---
 
@@ -449,12 +453,13 @@ The repository includes **167 automated unit and integration tests with a 100% p
 - tests/test_oauth.py                  : 16 passed (JWT tokens, PBKDF2 hashing, refresh grants, sub claims)
 - tests/test_admin.py                  : 13 passed (Mandate updates, customer provisioning, admin security)
 - tests/test_merchant_agent.py         : 10 passed (Gemini LLM reasoning, quote grounding, add-on recommendations)
-- tests/test_audit.py                  : 9 passed  (Immutable SQLite/Postgres logging, hash chaining, GET /audit/anchor)
+- tests/test_audit.py                  : 9 passed  (Hash-chained, tamper-evident audit ledger with exportable anchors, GET /audit/anchor)
 - tests/test_catalog.py                : 9 passed  (Product filtering, multi-token search, 48-product catalog)
 - tests/test_mcp_remote.py             : 8 passed  (Streamable HTTP, auth headers, token isolation)
 - tests/test_customer_mandate.py       : 5 passed  (Conversational mandate queries, two-step human gating tokens)
 - tests/test_google_oauth_and_signup.py: 5 passed  (Google SSO redirect, self-service registration, auto-provisioning)
 - tests/test_dashboard.py              : 3 passed  (HTML dashboard, static CSS/JS serving)
+
 ```
 
 ---

@@ -159,7 +159,7 @@ def run_3min_journey():
     print_step_header(
         4,
         "Approval Gate & Controlled Settlement",
-        "Sign single-use token; settle via customer simulated mandate balance",
+        "Razorpay test-mode order/payment verification is live; autonomous mandate settlement is demonstrated through a controlled sandbox wallet",
     )
     if confirmation_token:
         print(f"  [>] Submitting Confirmation Token: {confirmation_token[:25]}...")
@@ -172,7 +172,7 @@ def run_3min_journey():
         confirm_data = confirm_resp.json()
         print(f"\n  [<] Confirmation & Settlement Successful:")
         print(f"      * Transaction ID:    {confirm_data['transaction_id']}")
-        print(f"      * Settlement Rail:   Customer Simulated Mandate Balance")
+        print(f"      * Settlement Rail:   Controlled Sandbox Mandate Wallet")
         print(f"      * Decision:          {confirm_data['decision']}")
         print(f"      * Audit Reason:      {clean_str(confirm_data['reason'])}")
     else:
@@ -204,34 +204,31 @@ def run_3min_journey():
         print(f"      * Payment URL:       {pr.get('payment_url')}")
         print(f"      * Payment Method:    {pr.get('payment_method')} (Safe fallback)")
 
-
-
     # --------------------------------------------------------------------------
     # STEP 6: Cryptographic Dual-Layer Audit Verification
     # --------------------------------------------------------------------------
     print_step_header(
         6,
-        "Cryptographic Audit Trail Verification",
-        "Verify SHA-256 tamper-evident event chain & projection ledger integrity",
+        "Tamper-Evident Audit Ledger Verification",
+        "Verify hash-chained, tamper-evident audit ledger with exportable anchors",
     )
     admin_headers = {"X-Admin-API-Key": get_admin_api_key()}
     audit_resp = client.get("/audit/verify", headers=admin_headers)
     assert audit_resp.status_code == 200, audit_resp.text
     audit_data = audit_resp.json()
 
-
     print(f"  [<] Audit Ledger Integrity Check:")
     print(f"      * Cryptographic Chain Valid: {audit_data.get('valid')}")
     print(f"      * Ledger Verification Status: {audit_data.get('status')}")
     print(f"      * Total Cryptographic Events: {audit_data.get('total_records')}")
     print(f"      * Projections Reconciled:     {audit_data.get('total_projections_reconciled')}")
-    print(f"      * Immutable Chain Head Hash:  {audit_data.get('chain_head')}")
-    print(f"      * Audit Proof:                100% UNTAMPERED DUAL-LAYER PROOF")
-
+    print(f"      * Exportable Anchor Head:     {audit_data.get('chain_head')}")
+    print(f"      * Audit Proof:                Hash-Chained, Tamper-Evident Audit Ledger with Exportable Anchors")
 
     print("\n" + "=" * 80)
     print("  [SUCCESS] 3-MINUTE BUYER JOURNEY COMPLETED WITH ZERO ERRORS!")
     print("=" * 80 + "\n")
+
 
 
 
