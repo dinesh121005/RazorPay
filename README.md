@@ -554,25 +554,6 @@ python scripts/demo_gemini_grounding.py
 python scripts/verify_live_razorpay.py
 ```
 
----
-
-## 🎙️ 60-Second Finalist Pitch Script (For the Judging Panel)
-
-> *"Good afternoon judges. Today, AI buyers like Claude Desktop are ready to purchase, but merchants cannot safely transact with them without risking overspending, hallucinations, or payment fraud.*
-> 
-> *Our solution is the **Agentic Commerce Gateway** for **Track 01: Transactable Merchants**.*
-> 
-> *Here is the one loop we solve: **A merchant becomes safely sellable to AI buyers, and the merchant's sales AI raises basket value without exceeding the buyer's spending mandate.***
-> 
-> *First, when an AI buyer inquires for a keyboard under ₹2,000, our Merchant Sales AI—powered by Gemini 2.5 Flash and grounded in private inventory—proposes the right product and cross-sells a complementary coffee mug within budget headroom. We empirically benchmarked this across 47 sessions: it delivers a **+40.8% average order value uplift** with **100% budget compliance**.*
-> 
-> *Second, we enforce a zero-trust policy mandate: micro-orders under ₹500 auto-pay, mid-tier orders require a signed 5-minute human confirmation token, and out-of-budget items gracefully escalate to a hosted Razorpay checkout with dynamic UPI QR code.*
-> 
-> *Third, every single event is chained in a SHA-256 tamper-evident audit ledger with exportable cryptographic root anchors, and payment capture is gated strictly behind server-side HMAC signature verification.*
-> 
-> *With 187 automated tests, real Razorpay test rails, and remote MCP support, we turn any catalog into an AI-ready, revenue-maximizing storefront."*
-
----
 
 ## 🏆 Summary of Hackathon Evaluation Strengths
 
