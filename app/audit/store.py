@@ -834,7 +834,140 @@ class AuditStore:
                 "anchored_at": datetime.now(timezone.utc).isoformat(),
             }
 
+    def get_recommendation_analytics(self) -> Dict[str, Any]:
+        """
+        Calculates recommendation analytics strictly from payment transaction records
+        and recommendation lifecycle events.
+        """
+        self._ensure_db_initialized()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                """
+                SELECT SUM(amount), COUNT(*) FROM audit_records
+                WHERE payment_status IN ('captured', 'paid') OR (decision = 'APPROVED' AND payment_status != 'failed');
+                """
+            )
+            rev_row = cursor.fetchone()
+            total_completed_revenue = float(rev_row[0]) if rev_row and rev_row[0] is not None else 0.0
+            total_settled_transactions = int(rev_row[1]) if rev_row and rev_row[1] is not None else 0
+
+            cursor.execute("SELECT COUNT(*) FROM audit_events WHERE event_type = 'RECOMMENDATION_GENERATED';")
+            rec_generated_count = int(cursor.fetchone()[0])
+
+            cursor.execute("SELECT COUNT(*) FROM audit_events WHERE event_type = 'RECOMMENDATION_SHOWN';")
+            rec_shown_count = int(cursor.fetchone()[0])
+
+            cursor.execute("SELECT COUNT(*) FROM audit_events WHERE event_type = 'RECOMMENDATION_ACCEPTED';")
+            rec_accepted_count = int(cursor.fetchone()[0])
+
+            cursor.execute("SELECT COUNT(*) FROM audit_events WHERE event_type = 'RECOMMENDATION_REJECTED';")
+            rec_rejected_count = int(cursor.fetchone()[0])
+
+            cursor.execute("SELECT COUNT(*) FROM audit_events WHERE event_type = 'RECOMMENDATION_PURCHASED';")
+            rec_purchased_count = int(cursor.fetchone()[0])
+
+            cursor.execute(
+                """
+                SELECT SUM(r.amount) FROM audit_records r
+                JOIN recommendations rec ON r.transaction_id = rec.addon_transaction_id
+                WHERE rec.status = 'PURCHASED' AND (r.payment_status IN ('captured', 'paid') OR (r.decision = 'APPROVED' AND r.payment_status != 'failed'));
+                """
+            )
+            addon_rev_row = cursor.fetchone()
+            ai_addon_revenue = float(addon_rev_row[0]) if addon_rev_row and addon_rev_row[0] is not None else 0.0
+
+            cursor.execute(
+                """
+                SELECT transaction_id, amount, payment_status, decision
+                FROM audit_records
+                WHERE payment_status IN ('captured', 'paid') OR (decision = 'APPROVED' AND payment_status != 'failed');
+                """
+            )
+            paid_rows = cursor.fetchall()
+
+            cursor.execute("SELECT recommendation_id, logical_order_group_id, primary_transaction_id, addon_transaction_id, status FROM recommendations;")
+            rec_rows = cursor.fetchall()
+
+            tx_to_group = {}
+            for _, grp_id, pri_tx, add_tx, _ in rec_rows:
+                if grp_id:
+                    if pri_tx:
+                        tx_to_group[pri_tx] = grp_id
+                    if add_tx:
+                        tx_to_group[add_tx] = grp_id
+
+            group_revenue = {}
+            group_has_primary = set()
+            group_has_paid_addon = set()
+
+            for tx_id, amt, p_st, dec in paid_rows:
+                grp = tx_to_group.get(tx_id, f"GRP-{tx_id[-8:]}")
+                group_revenue[grp] = group_revenue.get(grp, 0.0) + float(amt)
+                group_has_primary.add(grp)
+
+            for rec_id, grp_id, pri_tx, add_tx, st in rec_rows:
+                if st == 'PURCHASED' and grp_id:
+                    group_has_paid_addon.add(grp_id)
+
+            distinct_logical_orders_count = len(group_has_primary)
+            total_logical_order_revenue = sum(group_revenue.values())
+
+            logical_order_aov = (
+                round(total_logical_order_revenue / distinct_logical_orders_count, 2)
+                if distinct_logical_orders_count > 0
+                else 0.0
+            )
+
+            baseline_revenue = total_logical_order_revenue - ai_addon_revenue
+            baseline_aov = (
+                round(baseline_revenue / distinct_logical_orders_count, 2)
+                if distinct_logical_orders_count > 0
+                else 0.0
+            )
+
+            net_aov_lift_pct = (
+                round(((logical_order_aov - baseline_aov) / baseline_aov) * 100, 2)
+                if baseline_aov > 0
+                else 0.0
+            )
+
+            shown_opportunities_count = max(distinct_logical_orders_count, rec_shown_count)
+
+            attach_rate_pct = (
+                round((len(group_has_paid_addon) / max(1, shown_opportunities_count)) * 100, 2)
+                if shown_opportunities_count > 0
+                else 0.0
+            )
+
+            acceptance_rate_pct = (
+                round((rec_accepted_count / max(1, rec_shown_count)) * 100, 2)
+                if rec_shown_count > 0
+                else 0.0
+            )
+
+            return {
+                "source_of_truth": "Confirmed Payment/Transaction Records (audit_records)",
+                "total_completed_revenue_inr": total_completed_revenue,
+                "ai_addon_revenue_inr": ai_addon_revenue,
+                "logical_order_aov_inr": logical_order_aov,
+                "baseline_aov_inr": baseline_aov,
+                "net_aov_lift_percentage": net_aov_lift_pct,
+                "ai_addon_attach_rate_percentage": attach_rate_pct,
+                "recommendation_acceptance_rate_percentage": acceptance_rate_pct,
+                "distinct_logical_orders_count": distinct_logical_orders_count,
+                "lifecycle_counts": {
+                    "generated": rec_generated_count,
+                    "shown": rec_shown_count,
+                    "accepted": rec_accepted_count,
+                    "rejected": rec_rejected_count,
+                    "purchased": rec_purchased_count,
+                }
+            }
+
 
 # Default module-level singleton instance
 audit_store = AuditStore()
+
 

@@ -215,7 +215,7 @@
             <!-- Metric 1: Add-On AOV Lift -->
             <div class="ai-growth-stat-card highlight">
               <span class="stat-card-label" style="color: #059669;">Add-on AOV Revenue Uplift</span>
-              <div class="stat-card-value" style="color: #059669;" id="growth-aov-lift">+32.4%</div>
+              <div class="stat-card-value" style="color: #059669;" id="growth-aov-lift">+0.0%</div>
               <div class="stat-card-sub" id="growth-aov-sub">Average Order Value lifted via AI cross-sell add-ons</div>
             </div>
 
@@ -223,24 +223,24 @@
             <div class="ai-growth-stat-card">
               <span class="stat-card-label">Order Value Expansion (AOV)</span>
               <div class="stat-card-split">
-                <span id="growth-baseline-aov">₹1,499</span>
+                <span id="growth-baseline-aov">₹0</span>
                 <span class="split-arrow">→</span>
-                <span style="color: #059669; font-weight: 800;" id="growth-ai-aov">₹1,798</span>
+                <span style="color: #059669; font-weight: 800;" id="growth-ai-aov">₹0</span>
               </div>
-              <div class="stat-card-sub" id="growth-baseline-sub">+₹299 avg incremental add-on spend per AI cart</div>
+              <div class="stat-card-sub" id="growth-baseline-sub">+₹0 avg incremental add-on spend per AI cart</div>
             </div>
 
             <!-- Metric 3: AI Guided Attach Rate -->
             <div class="ai-growth-stat-card">
               <span class="stat-card-label">AI Upsell Attach Rate</span>
-              <div class="stat-card-value" style="color: #4F46E5;" id="growth-attach-rate">42.8%</div>
+              <div class="stat-card-value" style="color: #4F46E5;" id="growth-attach-rate">0.0%</div>
               <div class="stat-card-sub">Inquiries converting with complementary accessories</div>
             </div>
 
             <!-- Metric 4: Abandoned Intent Recovered -->
             <div class="ai-growth-stat-card">
               <span class="stat-card-label">Recovered Checkout Intent</span>
-              <div class="stat-card-value" style="color: #2563EB;" id="growth-ai-rev">₹9,998.00</div>
+              <div class="stat-card-value" style="color: #2563EB;" id="growth-ai-rev">₹0.00</div>
               <div class="stat-card-sub" id="growth-ai-share">Out-of-mandate sales recovered via Razorpay Hosted Links & QR</div>
             </div>
           </div>
@@ -250,11 +250,11 @@
             <div class="growth-split-bar-wrapper">
               <div class="split-bar-header">
                 <span class="text-xs" style="font-weight: 600; color: var(--text-secondary);">Attributed Revenue Breakdown: Baseline Sales vs. AI Guided Uplift</span>
-                <span class="mono text-xs" style="font-weight: 700; color: #059669;" id="growth-split-ratio">74% Direct | 26% AI Add-on Lift</span>
+                <span class="mono text-xs" style="font-weight: 700; color: #059669;" id="growth-split-ratio">100% Direct | 0% AI Add-on Lift</span>
               </div>
               <div class="growth-split-bar">
-                <div class="split-segment baseline" id="split-baseline-bar" style="width: 74%;"></div>
-                <div class="split-segment ai-lift" id="split-ai-bar" style="width: 26%;"></div>
+                <div class="split-segment baseline" id="split-baseline-bar" style="width: 100%;"></div>
+                <div class="split-segment ai-lift" id="split-ai-bar" style="width: 0%;"></div>
               </div>
             </div>
           </div>
@@ -548,6 +548,9 @@
             <h2 class="section-title">Store Product Catalog</h2>
             <p class="section-subtitle">Real-time inventory and pricing analyzed by the Merchant Sales AI Agent</p>
           </div>
+          <button class="btn btn-primary btn-sm" id="open-new-product-modal">
+            <span>+ Create Product</span>
+          </button>
         </div>
 
         <div class="catalog-grid" id="catalog-grid">
@@ -797,6 +800,55 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" data-close-modal="auth-key-modal">Cancel</button>
         <button id="save-auth-key-btn" class="btn btn-primary">Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Create / Edit Product -->
+  <div id="product-modal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="product-modal-title">Create New Catalog Product</h3>
+        <button class="modal-close" data-close-modal="product-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="prod-form-edit-id" value="">
+        <div class="form-group mb-3" id="prod-id-group">
+          <label class="form-label">Product ID (e.g. KB003)</label>
+          <input type="text" id="prod-id-input" class="input w-full" placeholder="KB003">
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Product Name</label>
+          <input type="text" id="prod-name-input" class="input w-full" placeholder="Wireless Mechanical Keyboard">
+        </div>
+        <div class="form-row mb-3">
+          <div class="form-group flex-1">
+            <label class="form-label">Category</label>
+            <input type="text" id="prod-category-input" class="input w-full" placeholder="electronics">
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">Merchant ID</label>
+            <input type="text" id="prod-merchant-input" class="input w-full" value="MERCH_ELEC">
+          </div>
+        </div>
+        <div class="form-row mb-3">
+          <div class="form-group flex-1">
+            <label class="form-label">Price (₹)</label>
+            <input type="number" id="prod-price-input" class="input w-full" step="0.01" placeholder="1499.00">
+          </div>
+          <div class="form-group flex-1">
+            <label class="form-label">Stock Units</label>
+            <input type="number" id="prod-stock-input" class="input w-full" placeholder="25" min="0">
+          </div>
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Description</label>
+          <textarea id="prod-desc-input" class="textarea w-full" rows="3" placeholder="Detailed product specifications..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="product-modal">Cancel</button>
+        <button id="save-product-btn" class="btn btn-primary">Save Product</button>
       </div>
     </div>
   </div>

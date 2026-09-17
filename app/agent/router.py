@@ -54,7 +54,10 @@ def propose_purchase(
             product_id=payload.product_id,
             quantity=payload.quantity,
             idempotency_key=payload.idempotency_key,
+            logical_order_group_id=payload.logical_order_group_id,
+            recommendation_id=payload.recommendation_id,
         )
+
     except (ProductNotFoundError, MandateNotFoundError) as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

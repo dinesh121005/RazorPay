@@ -1,7 +1,7 @@
 """
 Data models for Merchant-Side Sales AI Agent (Agent-to-Agent Commerce).
 """
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -28,6 +28,7 @@ class ProductQuote(BaseModel):
     stock_available: int = Field(..., description="Available inventory count")
     match_reasons: List[str] = Field(default_factory=list, description="Why this product matches the buyer's natural language requirements")
     within_budget: bool = Field(default=True, description="Whether total price is within buyer's requested budget")
+    recommendation_id: Optional[str] = Field(default=None, description="Unique lifecycle tracking UUID for add-on recommendations")
 
 
 class InquiryResponse(BaseModel):
@@ -48,6 +49,7 @@ class AddOnRecommendationRequest(BaseModel):
     """
     product_id: str = Field(..., description="Base product ID being purchased (e.g. 'KB001')")
     remaining_budget: Optional[float] = Field(default=None, description="Optional customer mandate budget headroom in INR (₹)")
+    customer_id: Optional[str] = Field(default="CUST001", description="Customer ID for mandate tracking")
 
 
 class AddOnRecommendationResponse(BaseModel):
@@ -60,5 +62,28 @@ class AddOnRecommendationResponse(BaseModel):
     total_addons: int = Field(..., description="Count of recommended add-on items")
     llm_reasoning_used: bool = Field(default=False, description="Whether live LLM reasoning (Gemini/OpenAI) generated these add-ons")
     llm_engine: Optional[str] = Field(default="Dynamic Headroom & Synergy Reasoning", description="Active AI reasoning engine label")
+    recommendation_id: Optional[str] = Field(default=None, description="Primary recommendation tracking UUID for lifecycle tracing")
 
 
+class RecommendationRespondRequest(BaseModel):
+    """
+    Payload for a Buyer AI Agent accepting or rejecting a merchant recommendation.
+    """
+    recommendation_id: str = Field(..., description="Unique recommendation ID received from suggest_addons")
+    decision: str = Field(..., description="Decision status: 'ACCEPT' or 'REJECT'")
+    customer_id: Optional[str] = Field(default="CUST001", description="Customer ID performing the action")
+    primary_transaction_id: Optional[str] = Field(default=None, description="Optional primary purchase transaction ID if primary purchase executed first")
+
+
+class RecommendationRespondResponse(BaseModel):
+    """
+    Outcome payload returned when a buyer responds to a recommendation.
+    """
+    recommendation_id: str = Field(..., description="Recommendation tracking UUID")
+    decision: str = Field(..., description="Terminal decision recorded: 'ACCEPTED' or 'REJECTED'")
+    status: str = Field(..., description="State label (e.g. 'ACCEPTED_AND_PURCHASED', 'REJECTED', 'ALREADY_PROCESSED')")
+    addon_purchased: bool = Field(default=False, description="Whether the add-on purchase succeeded")
+    revenue_attributed: float = Field(default=0.0, description="Add-on revenue attributed (only > 0 when payment captured/paid)")
+    logical_order_group_id: Optional[str] = Field(default=None, description="Shared logical order group UUID linking primary and add-on transactions")
+    addon_purchase_response: Optional[Dict[str, Any]] = Field(default=None, description="Full PurchaseResponse dict for the add-on transaction if accepted")
+    message: str = Field(..., description="Human-readable summary of the decision outcome")

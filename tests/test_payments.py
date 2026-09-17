@@ -515,7 +515,7 @@ def test_webhook_payment_failed_restores_inventory():
     import hmac
     import hashlib
     import json
-    from app.catalog.service import get_product
+    from app.catalog.service import get_product, decrement_stock
     from app.audit import audit_store
 
     from app.payment.router import get_webhook_secret
@@ -534,9 +534,9 @@ def test_webhook_payment_failed_restores_inventory():
         decision="APPROVED",
         decision_reason="Pre-seed for failure restore test",
     )
-    # Simulate stock decrement
-    prod.stock -= 2
-    assert prod.stock == initial_stock - 2
+    # Simulate stock decrement in DB
+    decrement_stock("HK001", 2)
+    assert get_product("HK001").stock == initial_stock - 2
 
     payload_dict = {
         "event_id": "evt_fail_test_777",
@@ -566,8 +566,9 @@ def test_webhook_payment_failed_restores_inventory():
     assert resp.status_code == 200
     assert resp.json()["event"] == "payment.failed"
 
-    # Inventory must be restored by +2
-    assert prod.stock == initial_stock
+    # Inventory must be restored by +2 in database
+    restored_prod = get_product("HK001")
+    assert restored_prod.stock == initial_stock
 
     # Audit status must be failed
     record = audit_store.get("txn-fail-restore-001")

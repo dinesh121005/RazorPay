@@ -151,6 +151,14 @@ class AgentPurchaseRequest(BaseModel):
         default=None,
         description="Optional client-supplied idempotency key to prevent duplicate orders on retry. Auto-generated if omitted."
     )
+    logical_order_group_id: Optional[str] = Field(
+        default=None,
+        description="Shared logical order group UUID linking primary and add-on transactions for AOV/attach rate telemetry."
+    )
+    recommendation_id: Optional[str] = Field(
+        default=None,
+        description="Optional recommendation UUID if purchasing a recommended add-on."
+    )
 
 
 class ConfirmPurchaseRequest(BaseModel):
@@ -186,6 +194,15 @@ class PurchaseResponse(BaseModel):
         default=None,
         description="Time-limited signed token required to execute confirm_purchase"
     )
+    logical_order_group_id: Optional[str] = Field(
+        default=None,
+        description="Shared logical order group UUID linking primary and add-on transactions."
+    )
+    recommendation_id: Optional[str] = Field(
+        default=None,
+        description="Optional recommendation UUID associated with this purchase."
+    )
+
 
 
 def execute_purchase(
@@ -193,7 +210,10 @@ def execute_purchase(
     product_id: str,
     quantity: int = 1,
     idempotency_key: Optional[str] = None,
+    logical_order_group_id: Optional[str] = None,
+    recommendation_id: Optional[str] = None,
 ) -> PurchaseResponse:
+
     """
     Executes the purchase proposal orchestration:
     1. Validate input parameters (quantity >= 1 and integer).
@@ -382,6 +402,8 @@ def execute_purchase(
             product_name=product.name,
         )
 
+    effective_group_id = logical_order_group_id or f"GRP-{transaction_id[-8:]}"
+
     return PurchaseResponse(
         decision=final_decision,
         reason=decision_reason,
@@ -393,7 +415,10 @@ def execute_purchase(
         idempotency_key=idempotency_key,
         requires_confirmation=requires_confirmation,
         confirmation_token=confirmation_token,
+        logical_order_group_id=effective_group_id,
+        recommendation_id=recommendation_id,
     )
+
 
 
 def confirm_purchase(

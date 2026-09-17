@@ -145,3 +145,14 @@ def get_growth_benchmark() -> dict:
     from scripts.benchmark_aov import run_benchmark
     return run_benchmark()
 
+
+@app.get("/api/analytics/recommendations", tags=["analytics"], summary="Real-time Recommendation & AOV Telemetry")
+def get_recommendation_analytics_endpoint() -> dict:
+    """
+    Returns dynamic recommendation lifecycle telemetry, exact Logical Order AOV uplift,
+    and attach rate computed strictly from confirmed transaction/payment records.
+    """
+    from app.audit.store import audit_store
+    return audit_store.get_recommendation_analytics()
+
+

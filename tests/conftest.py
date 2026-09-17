@@ -12,6 +12,7 @@ import pytest
 # Ensure standard test admin key is present in environment for test client runs
 os.environ["ADMIN_API_KEY"] = "test-admin-secret-key"
 
+from app.catalog import service as catalog_service
 from app.audit import audit_store
 from app.oauth.store import customer_auth_store
 from app.policy.store import DEMO_MANDATES, mandate_store
@@ -34,6 +35,7 @@ def isolate_test_environment(tmp_path, monkeypatch):
     monkeypatch.setattr(customer_auth_store, "db_path", test_db)
     monkeypatch.setattr(mandate_store, "db_path", test_db)
     monkeypatch.setattr(wallet_store, "db_path", test_db)
+    monkeypatch.setattr(catalog_service, "_catalog_initialized", False)
     audit_store._init_db()
     customer_auth_store._init_db()
     mandate_store._init_db()

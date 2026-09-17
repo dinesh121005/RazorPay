@@ -268,6 +268,12 @@ class AdminDashboard {
 
     const createCustBtn = document.getElementById("create-customer-btn");
     if (createCustBtn) createCustBtn.addEventListener("click", () => this.handleCreateCustomer());
+
+    const openNewProdBtn = document.getElementById("open-new-product-modal");
+    if (openNewProdBtn) openNewProdBtn.addEventListener("click", () => this.openCreateProductModal());
+
+    const saveProdBtn = document.getElementById("save-product-btn");
+    if (saveProdBtn) saveProdBtn.addEventListener("click", () => this.saveProduct());
   }
 
   updateKeyLabel() {
@@ -342,7 +348,9 @@ class AdminDashboard {
         this.fetchMandates(),
         this.fetchCatalog(),
         this.fetchGrowthBenchmark(),
+        this.fetchRecommendationAnalytics(),
       ]);
+
       this.renderOverviewMetrics();
       this.renderAnalyticsTab();
       this.renderAuditTable();
@@ -397,6 +405,18 @@ class AdminDashboard {
       console.warn("Failed fetching catalog:", e);
     }
   }
+
+  async fetchRecommendationAnalytics() {
+    try {
+      const res = await fetch("/api/analytics/recommendations");
+      if (res.ok) {
+        this.recommendationAnalyticsData = await res.json();
+      }
+    } catch (e) {
+      console.warn("Failed fetching recommendation analytics:", e);
+    }
+  }
+
 
   populateCustomerSelect() {
     if (!this.sandboxCustomerSelect || !Array.isArray(this.mandates)) return;
@@ -490,58 +510,38 @@ class AdminDashboard {
   renderGrowthMetrics() {
     if (!this.growthAovLift) return;
 
-    // Use Empirical Benchmark Data if available
-    if (this.growthBenchmarkData && this.growthBenchmarkData.empirical_metrics) {
-      const m = this.growthBenchmarkData.empirical_metrics;
-      const baseAov = Math.round(m.average_baseline_aov_inr);
-      const aiAov = Math.round(m.average_upsold_aov_inr);
-      const lift = m.net_aov_lift_percentage;
-      const attach = m.successful_addon_attach_rate_percentage;
+    // Render strictly dynamic telemetry from /api/analytics/recommendations
+    const d = this.recommendationAnalyticsData || {};
+    const baseAov = Math.round(d.baseline_aov_inr || 0);
+    const aiAov = Math.round(d.logical_order_aov_inr || 0);
+    const lift = Number(d.net_aov_lift_percentage || 0).toFixed(1);
+    const attach = Number(d.ai_addon_attach_rate_percentage || 0).toFixed(1);
+    const aiRev = Number(d.ai_addon_revenue_inr || 0);
+    const totalRev = Number(d.total_completed_revenue_inr || 0);
 
-      this.growthAovLift.textContent = `+${lift}%`;
-      if (this.growthBaselineAov) this.growthBaselineAov.textContent = `₹${baseAov.toLocaleString("en-IN")}`;
-      if (this.growthAiAov) this.growthAiAov.textContent = `₹${aiAov.toLocaleString("en-IN")}`;
-      if (this.growthAttachRate) this.growthAttachRate.textContent = `${attach}%`;
-      if (this.growthAovSub) this.growthAovSub.textContent = `Average Order Value lifted via headroom-aware cross-sell`;
-      if (this.growthBaselineSub) this.growthBaselineSub.textContent = `+₹${aiAov - baseAov} avg add-on spend per AI cart`;
-      if (this.growthSplitRatio) this.growthSplitRatio.textContent = `71% Direct | 29% AI Add-on Lift`;
-      if (this.splitBaselineBar) this.splitBaselineBar.style.width = "71%";
-      if (this.splitAiBar) this.splitAiBar.style.width = "29%";
-      return;
-    }
-
-    // Fallback calculation from local auditRecords
-    const records = this.auditRecords || [];
-    const approvedRecords = records.filter((r) => r.decision === "APPROVED");
-    const capturedRecords = records.filter((r) => r.payment_status === "captured" || r.payment_status === "paid");
-
-    const addOnIds = ["HK001", "HK002", "FD007", "FD011", "FD021", "EL001"];
-    const addOnTx = records.filter((r) => addOnIds.includes(r.product_id) || r.quantity > 1 || r.amount > 1600);
-
-    const recoveredRecords = records.filter(
-      (r) =>
-        r.amount >= 2000 ||
-        (r.decision_reason && (r.decision_reason.includes("checkout") || r.decision_reason.includes("webhook") || r.decision_reason.includes("Escalated")))
-    );
-    const recoveredVol = recoveredRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-
-    const baseAov = 708.0;
-    const avgAddOnVal = 289.0;
-    const aiAov = baseAov + avgAddOnVal;
-    const aovLiftPct = 40.8;
-
-    this.growthAovLift.textContent = `+${aovLiftPct}%`;
+    this.growthAovLift.textContent = `+${lift}%`;
     if (this.growthBaselineAov) this.growthBaselineAov.textContent = `₹${baseAov.toLocaleString("en-IN")}`;
     if (this.growthAiAov) this.growthAiAov.textContent = `₹${aiAov.toLocaleString("en-IN")}`;
-    if (this.growthAttachRate) this.growthAttachRate.textContent = `78.7%`;
+    if (this.growthAttachRate) this.growthAttachRate.textContent = `${attach}%`;
     if (this.growthAiRev) {
-      this.growthAiRev.textContent = `₹${(recoveredVol > 0 ? recoveredVol : 9998.0).toLocaleString("en-IN", {
+      this.growthAiRev.textContent = `₹${aiRev.toLocaleString("en-IN", {
         minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       })}`;
     }
-    if (this.growthSplitRatio) this.growthSplitRatio.textContent = `71% Direct | 29% AI Add-on Lift`;
-    if (this.splitBaselineBar) this.splitBaselineBar.style.width = "71%";
-    if (this.splitAiBar) this.splitAiBar.style.width = "29%";
+    if (this.growthAovSub) this.growthAovSub.textContent = `Logical Order AOV lifted via headroom-aware cross-sell`;
+    if (this.growthBaselineSub) this.growthBaselineSub.textContent = `+₹${Math.max(0, aiAov - baseAov)} avg add-on spend per logical order`;
+
+    let aiSharePct = 0;
+    let baseSharePct = 100;
+    if (totalRev > 0) {
+      aiSharePct = Math.min(100, Math.max(0, Math.round((aiRev / totalRev) * 100)));
+      baseSharePct = 100 - aiSharePct;
+    }
+
+    if (this.growthSplitRatio) this.growthSplitRatio.textContent = `${baseSharePct}% Direct | ${aiSharePct}% AI Add-on Lift`;
+    if (this.splitBaselineBar) this.splitBaselineBar.style.width = `${baseSharePct}%`;
+    if (this.splitAiBar) this.splitAiBar.style.width = `${aiSharePct}%`;
   }
 
 
@@ -1191,6 +1191,7 @@ class AdminDashboard {
         const safeCat = escapeHtml(p.category);
         const safeName = escapeHtml(p.name);
         const safeDesc = escapeHtml(p.description || "No description provided.");
+        const safeNameEsc = escapeHtml(p.name).replace(/'/g, "\\'");
 
         return `
           <div class="product-card">
@@ -1206,10 +1207,171 @@ class AdminDashboard {
               <span class="product-price">₹${priceDisplay}</span>
               ${stockBadge}
             </div>
+            <div class="product-card-actions" style="display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid #F1F5F9; margin-top: 12px; padding-top: 10px;">
+              <button class="btn btn-secondary btn-sm" onclick="dashboard.openEditProductModal('${safeId}')">Edit</button>
+              <button class="btn btn-danger btn-sm" style="background: #FEF2F2; color: #DC2626; border: 1px solid #FCA5A5;" onclick="dashboard.confirmArchiveProduct('${safeId}', '${safeNameEsc}')">Archive</button>
+            </div>
           </div>
         `;
       })
       .join("");
+  }
+
+  openCreateProductModal() {
+    const editIdInput = document.getElementById("prod-form-edit-id");
+    const idInput = document.getElementById("prod-id-input");
+    const idGroup = document.getElementById("prod-id-group");
+    const nameInput = document.getElementById("prod-name-input");
+    const catInput = document.getElementById("prod-category-input");
+    const merchantInput = document.getElementById("prod-merchant-input");
+    const priceInput = document.getElementById("prod-price-input");
+    const stockInput = document.getElementById("prod-stock-input");
+    const descInput = document.getElementById("prod-desc-input");
+    const modalTitle = document.getElementById("product-modal-title");
+
+    if (editIdInput) editIdInput.value = "";
+    if (idInput) {
+      idInput.value = "";
+      idInput.disabled = false;
+    }
+    if (idGroup) idGroup.style.display = "block";
+    if (nameInput) nameInput.value = "";
+    if (catInput) catInput.value = "electronics";
+    if (merchantInput) merchantInput.value = "MERCH_ELEC";
+    if (priceInput) priceInput.value = "";
+    if (stockInput) stockInput.value = "10";
+    if (descInput) descInput.value = "";
+    if (modalTitle) modalTitle.textContent = "Create New Catalog Product";
+
+    this.openModal("product-modal");
+  }
+
+  openEditProductModal(productId) {
+    const product = (this.products || []).find((p) => p.id === productId);
+    if (!product) return;
+
+    const editIdInput = document.getElementById("prod-form-edit-id");
+    const idInput = document.getElementById("prod-id-input");
+    const idGroup = document.getElementById("prod-id-group");
+    const nameInput = document.getElementById("prod-name-input");
+    const catInput = document.getElementById("prod-category-input");
+    const merchantInput = document.getElementById("prod-merchant-input");
+    const priceInput = document.getElementById("prod-price-input");
+    const stockInput = document.getElementById("prod-stock-input");
+    const descInput = document.getElementById("prod-desc-input");
+    const modalTitle = document.getElementById("product-modal-title");
+
+    if (editIdInput) editIdInput.value = product.id;
+    if (idInput) {
+      idInput.value = product.id;
+      idInput.disabled = true;
+    }
+    if (idGroup) idGroup.style.display = "block";
+    if (nameInput) nameInput.value = product.name || "";
+    if (catInput) catInput.value = product.category || "electronics";
+    if (merchantInput) merchantInput.value = product.merchant_id || "MERCH_ELEC";
+    if (priceInput) priceInput.value = product.price != null ? product.price : "";
+    if (stockInput) stockInput.value = product.stock != null ? product.stock : "0";
+    if (descInput) descInput.value = product.description || "";
+    if (modalTitle) modalTitle.textContent = `Edit Product: ${product.id}`;
+
+    this.openModal("product-modal");
+  }
+
+  async saveProduct() {
+    const editId = (document.getElementById("prod-form-edit-id")?.value || "").trim();
+    const id = (document.getElementById("prod-id-input")?.value || "").trim();
+    const name = (document.getElementById("prod-name-input")?.value || "").trim();
+    const category = (document.getElementById("prod-category-input")?.value || "").trim();
+    const merchant_id = (document.getElementById("prod-merchant-input")?.value || "").trim() || "MERCH_ELEC";
+    const priceVal = parseFloat(document.getElementById("prod-price-input")?.value);
+    const stockVal = parseInt(document.getElementById("prod-stock-input")?.value, 10);
+    const description = (document.getElementById("prod-desc-input")?.value || "").trim();
+
+    if (!editId && !id) {
+      this.showToast("Product ID is required", "error");
+      return;
+    }
+    if (!name) {
+      this.showToast("Product name is required", "error");
+      return;
+    }
+    if (isNaN(priceVal) || priceVal <= 0) {
+      this.showToast("Valid price greater than ₹0 is required", "error");
+      return;
+    }
+    if (isNaN(stockVal) || stockVal < 0) {
+      this.showToast("Valid stock count (0 or greater) is required", "error");
+      return;
+    }
+
+    try {
+      let res;
+      if (editId) {
+        // Update existing product via PATCH /products/{id}
+        res = await this.fetchWithAuth(`/products/${encodeURIComponent(editId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: name,
+            category: category,
+            price: priceVal,
+            stock: stockVal,
+            description: description,
+          }),
+        });
+      } else {
+        // Create new product via POST /products
+        res = await this.fetchWithAuth("/products", {
+          method: "POST",
+          body: JSON.stringify({
+            id: id,
+            name: name,
+            category: category,
+            merchant_id: merchant_id,
+            price: priceVal,
+            stock: stockVal,
+            description: description,
+          }),
+        });
+      }
+
+      if (res.ok) {
+        this.showToast(editId ? `Product ${editId} updated` : `Product ${id} created`, "success");
+        this.closeModal("product-modal");
+        await this.fetchCatalog();
+        this.renderCatalogGrid();
+      } else {
+        const err = await res.json().catch(() => ({ detail: "Request failed" }));
+        this.showToast(`Failed: ${err.detail || "Error saving product"}`, "error");
+      }
+    } catch (e) {
+      console.error("Save product error:", e);
+      this.showToast("Error saving product: " + e.message, "error");
+    }
+  }
+
+  async confirmArchiveProduct(productId, productName) {
+    if (!confirm(`Are you sure you want to archive product '${productName}' (${productId})?`)) {
+      return;
+    }
+
+    try {
+      const res = await this.fetchWithAuth(`/products/${encodeURIComponent(productId)}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        this.showToast(`Product ${productId} archived`, "success");
+        await this.fetchCatalog();
+        this.renderCatalogGrid();
+      } else {
+        const err = await res.json().catch(() => ({ detail: "Request failed" }));
+        this.showToast(`Failed to archive: ${err.detail || "Error archiving product"}`, "error");
+      }
+    } catch (e) {
+      console.error("Archive product error:", e);
+      this.showToast("Error archiving product: " + e.message, "error");
+    }
   }
 
   showTxDetail(txId) {
@@ -1468,9 +1630,28 @@ class AdminDashboard {
   }
 
   renderPurchaseCompletion(purData, productId, inqData, humanConfirmed = false) {
-    const isApproved = purData.decision === "APPROVED";
-    this.sandboxStatusPill.className = isApproved ? "badge badge-success" : "badge badge-danger";
-    this.sandboxStatusPill.textContent = isApproved ? "Purchase Approved (Auto-Debited)" : "Policy Rejected (Manual Pay Available)";
+    const dec = purData.decision;
+    const isApproved = dec === "APPROVED";
+    const isPendingConf = dec === "PENDING_CONFIRMATION" || dec === "REQUIRES_CONFIRMATION" || purData.requires_confirmation;
+    const isFailed = dec === "PAYMENT_FAILED";
+    const isRejected = dec === "REJECTED";
+
+    if (isApproved) {
+      this.sandboxStatusPill.className = "badge badge-success";
+      this.sandboxStatusPill.textContent = "Purchase Approved (Auto-Debited)";
+    } else if (isPendingConf) {
+      this.sandboxStatusPill.className = "badge badge-warning";
+      this.sandboxStatusPill.textContent = "Awaiting Human Approval";
+    } else if (isFailed) {
+      this.sandboxStatusPill.className = "badge badge-danger";
+      this.sandboxStatusPill.textContent = "Payment Failed";
+    } else if (isRejected) {
+      this.sandboxStatusPill.className = "badge badge-danger";
+      this.sandboxStatusPill.textContent = "Policy Rejected (Manual Pay Available)";
+    } else {
+      this.sandboxStatusPill.className = "badge badge-warning";
+      this.sandboxStatusPill.textContent = escapeHtml(dec || "Processing");
+    }
 
     const refCode = isApproved ? `REF-${purData.transaction_id.slice(-8).toUpperCase()}` : "N/A";
     const rzpOrderId = purData.payment && purData.payment.razorpay_order_id
@@ -1576,8 +1757,9 @@ class AdminDashboard {
   }
 
   async runGuidedUpsellDemo() {
+    const custId = "CUST001";
     this.sandboxPrompt.value = "i want a mechanical keyboard under 2000";
-    this.sandboxCustomerSelect.value = "CUST001";
+    this.sandboxCustomerSelect.value = custId;
     this.sandboxBudget.value = "2000";
     this.sandboxQty.value = "1";
 
@@ -1585,60 +1767,47 @@ class AdminDashboard {
     this.sandboxStatusPill.textContent = "Running Guided Selling & Upsell...";
     this.sandboxConsole.innerHTML = `
       <div class="trace-step info">
-        <div class="trace-step-header">🛍️ Step 1: Buyer AI Inquires Merchant Sales Agent</div>
+        <div class="trace-step-header">🛍️ Step 1: Buyer AI Inquiry</div>
         <div>Query: <em>"I want a mechanical keyboard under 2000"</em></div>
-        <div class="text-xs text-muted">Customer: Dinesh Kumar (CUST001, Mandate Limit: ₹2,000)</div>
+        <div class="text-xs text-muted">Customer: ${escapeHtml(custId)}</div>
       </div>
     `;
 
     try {
-      // 1. Inquiry
+      // Step 1: Merchant AI Inquiry
       const inqRes = await fetch("/merchant/inquire", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: "i want a mechanical keyboard under 2000", max_budget: 2000 }),
       });
       const inqData = await inqRes.json();
-      const baseProduct = inqData.quotes && inqData.quotes[0] ? inqData.quotes[0] : { product_id: "KB001", name: "Mechanical Gaming Keyboard", price_per_unit: 1499.0 };
+      const baseProduct = inqData.quotes && inqData.quotes[0]
+        ? inqData.quotes[0]
+        : { product_id: "KB001", name: "Mechanical Gaming Keyboard", price_per_unit: 1499.0 };
+      const primaryPrice = baseProduct.total_price || baseProduct.price_per_unit || 1499.0;
 
-      // 2. Recommend Add-ons (Track 01 Revenue Uplift)
-      const addonRes = await fetch("/merchant/recommend-addons", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: baseProduct.product_id, remaining_budget: 501.0 }),
-      });
-      const addonData = await addonRes.json();
-      const topAddon = addonData.addons && addonData.addons[0] ? addonData.addons[0] : { product_id: "HK001", name: "Ceramic Coffee Desk Mug", price_per_unit: 299.0 };
-
-      const basePrice = baseProduct.price_per_unit || 1499.0;
-      const addonPrice = topAddon.price_per_unit || 299.0;
-      const bundledTotal = basePrice + addonPrice;
-      const aovLift = Math.round((addonPrice / basePrice) * 100);
+      // Determine customer mandate limit dynamically
+      let customerMandateLimit = 2000.0;
+      if (Array.isArray(this.mandates)) {
+        const cust = this.mandates.find((m) => m.customer_id === custId);
+        if (cust && (cust.mandate_limit || cust.max_transaction_amount)) {
+          customerMandateLimit = Number(cust.mandate_limit || cust.max_transaction_amount);
+        }
+      }
 
       const engineLabel = inqData.llm_engine || "Grounded Semantic Knowledge Graph";
       const isLlmBadge = inqData.llm_reasoning_used ? "🤖 LIVE GEMINI LLM" : "🧠 GROUNDED SEMANTIC GRAPH";
 
       this.sandboxConsole.innerHTML += `
         <div class="trace-step success">
-          <div class="trace-step-header">💡 Step 2: Merchant Sales Agent Formulates Grounded Quote & Cross-Sell</div>
-          <div class="text-xs mb-2"><span class="badge" style="background: rgba(59, 130, 246, 0.12); color: #2563EB; font-weight: 600;">Engine: ${escapeHtml(engineLabel)} (${isLlmBadge})</span></div>
-          <div>Primary Item: <strong>${escapeHtml(baseProduct.name)}</strong> — ₹${basePrice.toFixed(2)}</div>
-          <div class="text-xs text-muted mt-1">Sales Reasoning: <em>"${escapeHtml(inqData.merchant_notes || "Selected top matching product.")}"</em></div>
-          <div class="mt-2 p-2" style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10B981; border-radius: 4px;">
-            <div style="font-weight: 700; color: #065F46;">🎯 Merchant Upsell Recommendation:</div>
-            <div class="text-xs mt-1">Recommended Complementary Add-on: <strong>${escapeHtml(topAddon.name)}</strong> (₹${addonPrice.toFixed(2)})</div>
-            <div class="text-xs text-muted mt-1">Pitch: <em>"${escapeHtml(addonData.merchant_pitch)}"</em></div>
-          </div>
-        </div>
-
-        <div class="trace-step info">
-          <div class="trace-step-header">🤝 Step 3: Buyer AI Evaluates & Accepts Bundle</div>
-          <div>Buyer decision: Accepted complementary accessory within spending mandate cap!</div>
-          <div class="text-xs mt-1"><strong>Baseline Basket:</strong> ₹${basePrice.toFixed(2)} ➔ <strong>Augmented Basket:</strong> <span class="mono font-bold text-success">₹${bundledTotal.toFixed(2)}</span> (<strong style="color: #10B981;">+${aovLift}% AOV Lift</strong>)</div>
+          <div class="trace-step-header">💡 Step 2: Merchant AI Quote Formulated</div>
+          <div class="text-xs mb-1"><span class="badge" style="background: rgba(59, 130, 246, 0.12); color: #2563EB; font-weight: 600;">Engine: ${escapeHtml(engineLabel)} (${isLlmBadge})</span></div>
+          <div>Matched Primary Product: <strong>${escapeHtml(baseProduct.name)}</strong> (<span class="mono">${escapeHtml(baseProduct.product_id)}</span>)</div>
+          <div>Primary Price: <span class="mono font-bold">₹${primaryPrice.toFixed(2)}</span> | Customer Mandate Ceiling: ₹${customerMandateLimit.toFixed(2)}</div>
         </div>
       `;
 
-      // 3. Propose purchase of BOTH base item and recommended add-on item via gateway
+      // Step 3: Primary Purchase Policy Evaluation
       const nowTs = Date.now();
       const purRes = await fetch("/agent/purchase", {
         method: "POST",
@@ -1647,51 +1816,148 @@ class AdminDashboard {
           "X-Admin-API-Key": this.adminKey,
         },
         body: JSON.stringify({
-          customer_id: "CUST001",
+          customer_id: custId,
           product_id: baseProduct.product_id,
           quantity: 1,
           idempotency_key: `upsell-base-${nowTs}`,
         }),
       });
-      const purData = await purRes.json();
+      let purData = await purRes.json();
 
-      let addonPurData = null;
-      if (topAddon && topAddon.product_id) {
-        const addonRes = await fetch("/agent/purchase", {
+      // Step 4: Human Confirmation (when required by policy rules >= ₹500)
+      if ((purData.requires_confirmation || purData.decision === "REQUIRES_CONFIRMATION" || purData.decision === "PENDING_CONFIRMATION") && purData.confirmation_token) {
+        this.sandboxConsole.innerHTML += `
+          <div class="trace-step warning">
+            <div class="trace-step-header">🛡️ Step 3 & 4: Policy Evaluation & Human Confirmation Challenge</div>
+            <div class="font-bold text-warning">Verdict: REQUIRES_CONFIRMATION</div>
+            <div class="text-xs mt-1">Reason: ${escapeHtml(purData.reason || "Purchases >= ₹500 require human confirmation")}</div>
+            <div class="text-xs text-muted mt-1">Executing human approval token via /agent/confirm...</div>
+          </div>
+        `;
+
+        const confRes = await fetch("/agent/confirm", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Admin-API-Key": this.adminKey,
           },
-          body: JSON.stringify({
-            customer_id: "CUST001",
-            product_id: topAddon.product_id,
-            quantity: 1,
-            idempotency_key: `upsell-addon-${nowTs}`,
-          }),
+          body: JSON.stringify({ confirmation_token: purData.confirmation_token }),
         });
-        addonPurData = await addonRes.json();
+        purData = await confRes.json();
       }
 
-      this.sandboxStatusPill.className = "badge badge-success";
-      this.sandboxStatusPill.textContent = "Upsell Accepted & Settled";
+      const isPrimarySettled = purData.decision === "APPROVED" && (
+        !purData.payment || purData.payment.status === "captured" || purData.payment.status === "paid" || purData.payment.status !== "failed"
+      );
 
-      const baseRef = purData.transaction_id ? `REF-${purData.transaction_id.slice(-8).toUpperCase()}` : "REF-BASE";
-      const addonRef = (addonPurData && addonPurData.transaction_id) ? `REF-${addonPurData.transaction_id.slice(-8).toUpperCase()}` : "REF-ADDON";
+      if (!isPrimarySettled) {
+        this.sandboxStatusPill.className = "badge badge-danger";
+        this.sandboxStatusPill.textContent = "Primary Purchase Failed";
+        this.sandboxConsole.innerHTML += `
+          <div class="trace-step danger">
+            <div class="trace-step-header">❌ Step 5: Primary Purchase Failed</div>
+            <div>Verdict: ${escapeHtml(purData.decision)} - ${escapeHtml(purData.reason || "Payment declined")}</div>
+          </div>
+        `;
+        await this.fetchAllData();
+        return;
+      }
+
+      const primaryTxId = purData.transaction_id;
+      const baseRef = primaryTxId ? `REF-${primaryTxId.slice(-8).toUpperCase()}` : "REF-BASE";
 
       this.sandboxConsole.innerHTML += `
         <div class="trace-step success">
-          <div class="trace-step-header">✅ Step 4: Policy Clearance & Multi-Item Settlement</div>
-          <div>Verdict: <span class="badge badge-success">APPROVED BUNDLE</span> | Mandate Cap: ₹2,000.00</div>
-          <div class="text-xs mt-1">1. Primary Item: <strong>${escapeHtml(baseProduct.name)}</strong> (₹${basePrice.toFixed(2)}) — <span class="mono font-bold">${baseRef}</span></div>
-          ${addonPurData ? `<div class="text-xs mt-1">2. Add-on Item: <strong>${escapeHtml(topAddon.name)}</strong> (₹${addonPrice.toFixed(2)}) — <span class="mono font-bold">${addonRef}</span></div>` : ""}
-          <div class="mt-2 text-xs">Total Settled Amount: <span class="mono font-bold text-success">₹${bundledTotal.toFixed(2)}</span> (Basket Uplift: <strong>+${aovLift}% AOV Lift</strong>)</div>
-          <div class="badge badge-success mt-2">⚡ Pre-authorized Mandate Debited (Status: PAID)</div>
+          <div class="trace-step-header">⚡ Step 5: Primary Settlement Confirmed</div>
+          <div>Status: <span class="badge badge-success">APPROVED & CAPTURED</span> | Primary Transaction ID: <span class="mono font-bold">${baseRef}</span></div>
+          <div class="text-xs text-muted mt-1">Amount Debited: ₹${primaryPrice.toFixed(2)}</div>
+        </div>
+      `;
+
+      // Step 6: Dynamic Remaining Headroom Calculation & Dynamic Add-On Recommendation
+      const remainingHeadroom = Math.max(0, customerMandateLimit - primaryPrice);
+
+      const addonRes = await fetch("/merchant/recommend-addons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: baseProduct.product_id,
+          remaining_budget: remainingHeadroom,
+          customer_id: custId,
+        }),
+      });
+      const addonData = await addonRes.json();
+      const topAddon = addonData.addons && addonData.addons[0] ? addonData.addons[0] : null;
+
+      if (!topAddon || !addonData.recommendation_id) {
+        this.sandboxStatusPill.className = "badge badge-info";
+        this.sandboxStatusPill.textContent = "No Add-ons Available";
+        this.sandboxConsole.innerHTML += `
+          <div class="trace-step info">
+            <div class="trace-step-header">ℹ️ Step 6: Dynamic Add-On Recommendation</div>
+            <div>Calculated Remaining Headroom: <span class="mono font-bold">₹${remainingHeadroom.toFixed(2)}</span></div>
+            <div>Merchant Pitch: <em>"${escapeHtml(addonData.merchant_pitch || "No complementary items fit remaining headroom.")}"</em></div>
+          </div>
+        `;
+        await this.fetchAllData();
+        return;
+      }
+
+      const recId = addonData.recommendation_id;
+      const addonPrice = topAddon.price_per_unit || topAddon.total_price || 0.0;
+
+      this.sandboxConsole.innerHTML += `
+        <div class="trace-step success">
+          <div class="trace-step-header">🎯 Step 6: Dynamic Add-On Recommendation</div>
+          <div>Recommendation ID: <span class="mono font-bold">${escapeHtml(recId)}</span> (Lifecycle Status: <strong>SHOWN</strong>)</div>
+          <div>Recommended Add-On: <strong>${escapeHtml(topAddon.name)}</strong> (<span class="mono">${escapeHtml(topAddon.product_id)}</span>) — ₹${addonPrice.toFixed(2)}</div>
+          <div class="text-xs text-muted mt-1">Calculated Headroom: ₹${remainingHeadroom.toFixed(2)} | Pitch: <em>"${escapeHtml(addonData.merchant_pitch)}"</em></div>
+        </div>
+      `;
+
+      // Step 7: Buyer Accepts Add-On via Official Backend REST API
+      const respondRes = await fetch("/merchant/recommendation/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recommendation_id: recId,
+          decision: "ACCEPT",
+          customer_id: custId,
+          primary_transaction_id: primaryTxId,
+        }),
+      });
+      const respData = await respondRes.json();
+
+      const isPurchased = respData.status === "ACCEPTED_AND_PURCHASED";
+      const isAddonFailed = respData.status === "ACCEPTED_PAYMENT_FAILED";
+      const isPendingConf = respData.status === "ACCEPTED_PENDING_CONFIRMATION";
+
+      this.sandboxStatusPill.className = isPurchased ? "badge badge-success" : (isAddonFailed ? "badge badge-danger" : "badge badge-warning");
+      this.sandboxStatusPill.textContent = isPurchased
+        ? "Upsell Accepted & Settled"
+        : (isAddonFailed ? "Add-on Payment Failed" : (isPendingConf ? "Add-on Awaiting Confirmation" : `Upsell ${escapeHtml(respData.status)}`));
+
+      const addonTx = respData.addon_purchase_response ? respData.addon_purchase_response.transaction_id : null;
+      const addonRef = addonTx ? `REF-${addonTx.slice(-8).toUpperCase()}` : "NONE";
+      const groupId = respData.logical_order_group_id || "GRP-NONE";
+      const actualAddonRev = respData.revenue_attributed || 0.0;
+      const actualTotalRev = primaryPrice + actualAddonRev;
+
+      // Step 8, 9, 10: Add-On Settlement, Linked Logical Order, Audit & Analytics
+      this.sandboxConsole.innerHTML += `
+        <div class="trace-step ${isPurchased ? "success" : (isAddonFailed ? "danger" : "warning")}">
+          <div class="trace-step-header">✅ Step 7–10: Add-On Settlement, Linked Logical Order & Audit Ledger</div>
+          <div>Backend Decision Verdict: <span class="badge ${isPurchased ? "badge-success" : (isAddonFailed ? "badge-danger" : "badge-warning")}">${escapeHtml(respData.status)}</span></div>
+          <div class="text-xs mt-1">Logical Order Group ID: <span class="mono font-bold">${escapeHtml(groupId)}</span></div>
+          <div class="text-xs mt-1">1. Primary Item: <strong>${escapeHtml(baseProduct.name)}</strong> (₹${primaryPrice.toFixed(2)}) — <span class="mono font-bold">${baseRef}</span></div>
+          <div class="text-xs mt-1">2. Add-on Item: <strong>${escapeHtml(topAddon.name)}</strong> (₹${addonPrice.toFixed(2)}) — <span class="mono font-bold">${addonRef}</span> (Status: ${respData.addon_purchased ? 'PAID & CAPTURED' : 'UNPAID / FAILED'})</div>
+          <div class="mt-2 text-xs">Total Settled Logical Order Revenue: <span class="mono font-bold text-success">₹${actualTotalRev.toFixed(2)}</span> (Recommendation ID: <span class="mono">${escapeHtml(recId)}</span>)</div>
+          ${isPurchased ? `<div class="badge badge-success mt-2">⚡ Both Primary & Add-on Linked & Confirmed (Status: PURCHASED)</div>` : ""}
         </div>
       `;
 
       await this.fetchAllData();
-      this.showToast(`Guided Selling Demo: Bundled purchase (₹${bundledTotal.toFixed(2)}) executed! +${aovLift}% AOV lift achieved!`, "success");
+      this.showToast(`Guided Selling Demo: Bundled purchase (₹${actualTotalRev.toFixed(2)}) completed!`, isPurchased ? "success" : "info");
     } catch (e) {
       console.error(e);
       this.showToast(`Guided Selling Demo error: ${e.message}`, "error");
@@ -1828,9 +2094,9 @@ class AdminDashboard {
         </div>
       `;
 
-      // 3. Propose Purchase & Mandate Policy Check
+      // 3. Propose Primary Purchase & Execute Recommendation Acceptance via Gateway
       const nowTs = Date.now();
-      const purRes = await fetch("/agent/purchase", {
+      const basePurRes = await fetch("/agent/purchase", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1838,19 +2104,34 @@ class AdminDashboard {
         },
         body: JSON.stringify({
           customer_id: "CUST001",
-          product_id: topAddon.product_id,
+          product_id: baseQuote.product_id,
           quantity: 1,
-          idempotency_key: `3min-addon-${nowTs}`,
+          idempotency_key: `3min-base-${nowTs}`,
         }),
       });
-      const purData = await purRes.json();
+      const basePurData = await basePurRes.json();
+
+      let respondData = null;
+      if (addonData && addonData.recommendation_id) {
+        const respondRes = await fetch("/merchant/recommendation/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recommendation_id: addonData.recommendation_id,
+            decision: "ACCEPT",
+            customer_id: "CUST001",
+            primary_transaction_id: basePurData.transaction_id,
+          }),
+        });
+        respondData = await respondRes.json();
+      }
 
       this.sandboxConsole.innerHTML += `
         <div class="trace-step info mt-2">
-          <div class="trace-step-header">🛡️ Step 3: Deterministic Policy Mandate Evaluation</div>
-          <div>Decision: <span class="badge ${purData.decision === 'APPROVED' ? 'badge-success' : 'badge-warning'}">${purData.decision}</span></div>
-          <div class="text-xs text-muted mt-1">${escapeHtml(purData.reason)}</div>
-          <div class="text-xs mt-1">Settlement Rail: <strong>Customer Simulated Mandate Balance (Controlled Auto-Debit)</strong></div>
+          <div class="trace-step-header">🛡️ Step 3: Linked Multi-Item Purchase & Mandate Clearance</div>
+          <div>Primary Status: <span class="badge ${basePurData.decision === 'APPROVED' ? 'badge-success' : 'badge-warning'}">${escapeHtml(basePurData.decision)}</span> | Add-on Status: <span class="badge ${respondData && respondData.status === 'ACCEPTED_AND_PURCHASED' ? 'badge-success' : 'badge-warning'}">${escapeHtml(respondData ? respondData.status : 'PROCESSED')}</span></div>
+          <div class="text-xs text-muted mt-1">Logical Order Group ID: <span class="mono font-bold">${escapeHtml(respondData ? respondData.logical_order_group_id : 'GRP-NONE')}</span></div>
+          <div class="text-xs mt-1">Settlement Rail: <strong>Customer Mandate (Auto-Debited & Linked Ledger)</strong></div>
         </div>
       `;
 

@@ -147,6 +147,27 @@ def suggest_addons_handler(
     return res.model_dump()
 
 
+def respond_to_recommendation_handler(
+    recommendation_id: str,
+    decision: str,
+    customer_id: Optional[str] = None,
+    primary_transaction_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Handler for Buyer AI Agent accepting or rejecting a merchant add-on recommendation.
+    Enforces terminal decision idempotency.
+    """
+    eff_cust = customer_id or authenticated_customer_id.get() or "CUST001"
+    res = merchant_agent_service.respond_to_recommendation(
+        recommendation_id=recommendation_id,
+        decision=decision,
+        customer_id=eff_cust,
+        primary_transaction_id=primary_transaction_id,
+    )
+    return res.model_dump()
+
+
+
 def search_products_handler(
     query: Optional[str] = None,
     category: Optional[str] = None,
@@ -683,6 +704,29 @@ def register_tools(server: MCPServer) -> None:
         )
 
     @server.tool(
+        name="respond_to_recommendation",
+        description=(
+            "Accept or Reject a merchant cross-sell add-on recommendation by recommendation_id. "
+            "If decision='ACCEPT', executes the add-on purchase proposal using the customer's mandate. "
+            "Enforces terminal decision idempotency (repeated calls return cached outcome without double charges)."
+        )
+    )
+    def respond_to_recommendation_tool(
+        recommendation_id: str,
+        decision: str,
+        customer_id: str = "CUST001",
+        primary_transaction_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Accept or reject a recommendation with terminal idempotency."""
+        return respond_to_recommendation_handler(
+            recommendation_id=recommendation_id,
+            decision=decision,
+            customer_id=customer_id,
+            primary_transaction_id=primary_transaction_id,
+        )
+
+
+    @server.tool(
         name="search_products",
         description=(
             "Search catalog products by name, category, or maximum price. "
@@ -800,6 +844,27 @@ def register_remote_tools(server: MCPServer) -> None:
             product_id=product_id,
             remaining_budget=remaining_budget,
         )
+
+    @server.tool(
+        name="respond_to_recommendation",
+        description=(
+            "Accept or Reject a merchant cross-sell add-on recommendation by recommendation_id on behalf of authenticated customer. "
+            "If decision='ACCEPT', executes the add-on purchase proposal using the customer's mandate. "
+            "Enforces terminal decision idempotency."
+        )
+    )
+    def respond_to_recommendation_remote(
+        recommendation_id: str,
+        decision: str,
+        primary_transaction_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Accept or reject a recommendation on behalf of authenticated customer."""
+        return respond_to_recommendation_handler(
+            recommendation_id=recommendation_id,
+            decision=decision,
+            primary_transaction_id=primary_transaction_id,
+        )
+
 
     @server.tool(
         name="search_products",
