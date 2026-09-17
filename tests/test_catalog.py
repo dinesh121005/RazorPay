@@ -121,3 +121,19 @@ def test_search_products_no_match():
     assert data == []
 
 
+def test_search_products_conversational_queries():
+    """10. Conversational query strings like 'yes search the keyboard' and 'mechanical keyboard' return KB001."""
+    res1 = client.get("/products?query=yes%20search%20the%20keyboard")
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert len(data1) >= 1
+    assert any(p["id"] == "KB001" for p in data1)
+
+    res2 = client.get("/products?query=mechanical%20keyboard")
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert len(data2) >= 1
+    assert any(p["id"] == "KB001" for p in data2)
+
+
+

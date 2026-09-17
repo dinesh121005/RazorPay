@@ -177,16 +177,29 @@ def search_products_handler(
     Handler executing product search against the catalog service.
     Returns list of matching product dicts with customer-facing fields (id, name, category, price).
     """
-    products = search_products(query=query, category=category, max_price=max_price)
-    return [
-        {
-            "id": p.id,
-            "name": p.name,
-            "category": p.category,
-            "price": p.price,
-        }
-        for p in products
-    ]
+    try:
+        clean_query = str(query).strip() if query is not None else None
+        clean_category = str(category).strip() if category is not None else None
+        clean_max_price: Optional[float] = None
+        if max_price is not None and str(max_price).strip() != "":
+            try:
+                clean_max_price = float(max_price)
+            except (ValueError, TypeError):
+                clean_max_price = None
+
+        products = search_products(query=clean_query, category=clean_category, max_price=clean_max_price)
+        return [
+            {
+                "id": p.id,
+                "name": p.name,
+                "category": p.category,
+                "price": p.price,
+            }
+            for p in products
+        ]
+    except Exception as e:
+        logger.error("Error executing search_products_handler: %s", e, exc_info=True)
+        return []
 
 
 def resolve_customer_handler(identifier: str) -> Dict[str, Any]:

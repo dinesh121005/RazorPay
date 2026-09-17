@@ -204,6 +204,39 @@ def search_products(
                 or all(w in f"{name_lower} {cat_lower} {desc_lower}" for w in query_words)
             ):
                 filtered.append(p)
+
+        if filtered:
+            return filtered
+
+        # Fallback 1: Filter common conversational filler terms
+        filler_words = {
+            "yes", "search", "for", "the", "a", "an", "buy", "find", "show",
+            "me", "get", "please", "want", "looking", "i", "can", "you", "need"
+        }
+        meaningful_words = [w for w in query_words if w not in filler_words and len(w) > 1]
+
+        if meaningful_words:
+            for p in all_products:
+                name_lower = p.name.lower()
+                desc_lower = (p.description or "").lower()
+                cat_lower = p.category.lower()
+                target_str = f"{name_lower} {cat_lower} {desc_lower}"
+                if all(w in target_str for w in meaningful_words):
+                    filtered.append(p)
+
+        if filtered:
+            return filtered
+
+        # Fallback 2: Match any meaningful word if all-word match still returned 0
+        if meaningful_words:
+            for p in all_products:
+                name_lower = p.name.lower()
+                desc_lower = (p.description or "").lower()
+                cat_lower = p.category.lower()
+                target_str = f"{name_lower} {cat_lower} {desc_lower}"
+                if any(w in target_str for w in meaningful_words if len(w) > 2):
+                    filtered.append(p)
+
         return filtered
 
     return all_products
