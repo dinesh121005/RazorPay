@@ -213,3 +213,56 @@ def test_razorpay_token_isolation():
     finally:
         authenticated_customer_id.reset(token_reset)
 
+
+def test_remote_mcp_search_products_integration():
+    """
+    Integration test: remote search_products handler returns product records matching query.
+    """
+    from app.mcp.tools import search_products_handler
+
+    # 1. Search keyboard
+    kb_res = search_products_handler(query="keyboard")
+    assert len(kb_res) >= 1
+    assert any(p["id"] == "KB001" for p in kb_res)
+
+    # 2. Search webcam
+    wc_res = search_products_handler(query="webcam")
+    assert len(wc_res) >= 1
+    assert any(p["id"] == "EL004" for p in wc_res)
+
+    # 3. Search mouse
+    m_res = search_products_handler(query="mouse")
+    assert len(m_res) >= 1
+    assert any(p["id"] == "EL001" for p in m_res)
+
+    # 4. FastMCP call_tool async test
+    remote_server = create_remote_mcp_server()
+
+    async def _check_mcp_call():
+        res = await remote_server.call_tool("search_products", {"query": "webcam"})
+        assert res.is_error is False
+        assert len(res.structured_content["result"]) >= 1
+        assert any(p["id"] == "EL004" for p in res.structured_content["result"])
+
+    import anyio
+    anyio.run(_check_mcp_call)
+
+
+def test_mcp_rest_catalog_alignment():
+    """
+    Verifies that the product set returned via REST GET /products matches the MCP catalog search products.
+    Detects any accidental divergence between REST catalog and MCP catalog.
+    """
+    from app.mcp.tools import search_products_handler
+
+    rest_res = client.get("/products")
+    assert rest_res.status_code == 200
+    rest_products = rest_res.json()
+    rest_ids = {p["id"] for p in rest_products}
+
+    mcp_products = search_products_handler()
+    mcp_ids = {p["id"] for p in mcp_products}
+
+    assert rest_ids == mcp_ids, f"Catalog divergence detected! REST has {len(rest_ids)} products, MCP has {len(mcp_ids)} products."
+
+

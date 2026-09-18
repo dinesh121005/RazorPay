@@ -65,9 +65,10 @@ class WalletStore:
             for cid, bal in DEMO_WALLET_BALANCES.items():
                 cursor.execute(
                     """
-                    INSERT OR IGNORE INTO customer_wallets
+                    INSERT INTO customer_wallets
                         (customer_id, balance, currency, created_at, updated_at)
                     VALUES (?, ?, 'INR', ?, ?)
+                    ON CONFLICT(customer_id) DO NOTHING;
                     """,
                     (cid, bal, now, now),
                 )

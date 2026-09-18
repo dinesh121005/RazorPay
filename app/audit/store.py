@@ -681,7 +681,7 @@ class AuditStore:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT OR IGNORE INTO processed_webhook_events (event_id, received_at) VALUES (?, ?);",
+                "INSERT INTO processed_webhook_events (event_id, received_at) VALUES (?, ?) ON CONFLICT(event_id) DO NOTHING;",
                 (event_id.strip(), time.time()),
             )
             conn.commit()

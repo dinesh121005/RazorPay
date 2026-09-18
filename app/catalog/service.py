@@ -153,9 +153,10 @@ def _ensure_catalog_db_initialized() -> None:
                 for tgt in targets:
                     cursor.execute(
                         """
-                        INSERT OR IGNORE INTO product_relationships (
+                        INSERT INTO product_relationships (
                             source_product_id, target_product_id, relationship_type, created_at
-                        ) VALUES (?, ?, 'COMPLEMENTARY', ?);
+                        ) VALUES (?, ?, 'COMPLEMENTARY', ?)
+                        ON CONFLICT(source_product_id, target_product_id) DO NOTHING;
                         """,
                         (src, tgt, now_ts),
                     )

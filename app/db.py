@@ -52,7 +52,7 @@ class PostgresCursorWrapper:
         if "INSERT OR IGNORE INTO" in clean_query:
             clean_query = clean_query.replace("INSERT OR IGNORE INTO", "INSERT INTO")
             if "ON CONFLICT" not in clean_query:
-                clean_query = clean_query.rstrip("; ") + " ON CONFLICT DO NOTHING"
+                clean_query = clean_query.rstrip("; \r\n\t") + " ON CONFLICT DO NOTHING"
 
         # Translate SQLite ? placeholders to PostgreSQL %s
         if "?" in clean_query:
@@ -63,7 +63,13 @@ class PostgresCursorWrapper:
         return self._cursor.execute(clean_query)
 
     def executemany(self, query: str, seq_of_params: Sequence[Sequence[Any]]) -> Any:
-        clean_query = query.replace("?", "%s") if "?" in query else query
+        clean_query = query
+        if "INSERT OR IGNORE INTO" in clean_query:
+            clean_query = clean_query.replace("INSERT OR IGNORE INTO", "INSERT INTO")
+            if "ON CONFLICT" not in clean_query:
+                clean_query = clean_query.rstrip("; \r\n\t") + " ON CONFLICT DO NOTHING"
+        if "?" in clean_query:
+            clean_query = clean_query.replace("?", "%s")
         return self._cursor.executemany(clean_query, seq_of_params)
 
     def fetchone(self) -> Optional[Tuple[Any, ...]]:

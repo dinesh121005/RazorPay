@@ -172,13 +172,15 @@ def search_products_handler(
     query: Optional[str] = None,
     category: Optional[str] = None,
     max_price: Optional[float] = None,
+    **kwargs: Any,
 ) -> List[Dict[str, Any]]:
     """
     Handler executing product search against the catalog service.
     Returns list of matching product dicts with customer-facing fields (id, name, category, price).
     """
     try:
-        clean_query = str(query).strip() if query is not None else None
+        raw_query = query or kwargs.get("search_query") or kwargs.get("q") or kwargs.get("text") or kwargs.get("input") or kwargs.get("name")
+        clean_query = str(raw_query).strip() if raw_query is not None else None
         clean_category = str(category).strip() if category is not None else None
         clean_max_price: Optional[float] = None
         if max_price is not None and str(max_price).strip() != "":
