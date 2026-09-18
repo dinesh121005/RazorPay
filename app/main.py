@@ -156,3 +156,62 @@ def get_recommendation_analytics_endpoint() -> dict:
     return audit_store.get_recommendation_analytics()
 
 
+@app.get("/debug-search", tags=["system"], summary="Production Search Diagnostic Endpoint")
+def debug_search_endpoint(query: str = "keyboard") -> dict:
+    """
+    Diagnostic endpoint to inspect database connection target, catalog table row count,
+    product statuses, and search_products execution traceback on Render.
+    """
+    import traceback
+    from app.db import get_db_connection
+    from app.catalog.service import search_products
+
+    raw_url = os.environ.get("DATABASE_URL", "gateway.db")
+    db_type = "postgresql" if ("postgres://" in raw_url or "postgresql://" in raw_url) else "sqlite"
+
+    result = {
+        "db_type": db_type,
+        "raw_url_prefix": raw_url[:15] if raw_url else "None",
+        "product_count": 0,
+        "kb001_product": None,
+        "sample_products": [],
+        "search_results": [],
+        "error": None,
+        "traceback": None,
+    }
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM catalog_products;")
+            result["product_count"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT id, name, category, price, stock, status FROM catalog_products WHERE id = 'KB001';")
+            kb_row = cursor.fetchone()
+            if kb_row:
+                result["kb001_product"] = {
+                    "id": kb_row[0],
+                    "name": kb_row[1],
+                    "category": kb_row[2],
+                    "price": kb_row[3],
+                    "stock": kb_row[4],
+                    "status": kb_row[5],
+                }
+
+            cursor.execute("SELECT id, name, category, price, stock, status FROM catalog_products LIMIT 5;")
+            result["sample_products"] = [
+                {"id": r[0], "name": r[1], "category": r[2], "price": r[3], "stock": r[4], "status": r[5]}
+                for r in cursor.fetchall()
+            ]
+
+        products = search_products(query=query)
+        result["search_results"] = [p.model_dump() for p in products]
+
+    except Exception as e:
+        result["error"] = str(e)
+        result["traceback"] = traceback.format_exc()
+
+    return result
+
+
+
