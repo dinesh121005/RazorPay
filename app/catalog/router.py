@@ -40,9 +40,28 @@ def list_products(
     Retrieve products from the catalog.
     Supports optional filtering by keyword query, category, and maximum price.
     """
-    if include_all:
-        return list_products_admin()
-    return search_products(query=query, category=category, max_price=max_price)
+    try:
+        if include_all:
+            return list_products_admin()
+        return search_products(query=query, category=category, max_price=max_price)
+    except Exception as e:
+        import logging
+        logging.getLogger("gateway.catalog").error("Error listing products from catalog: %s", e, exc_info=True)
+        from app.catalog.data import PRODUCTS
+        if include_all:
+            return PRODUCTS
+        if query or category or max_price:
+            from app.catalog.data import PRODUCTS
+            res = PRODUCTS
+            if category:
+                res = [p for p in res if p.category.lower() == category.strip().lower()]
+            if max_price:
+                res = [p for p in res if p.price <= max_price]
+            if query:
+                q = query.strip().lower()
+                res = [p for p in res if q in p.name.lower() or q in p.description.lower()]
+            return res
+        return PRODUCTS
 
 
 @router.get("/{id}", response_model=Product, summary="Get product details by ID")

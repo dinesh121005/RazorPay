@@ -83,24 +83,52 @@ def _ensure_catalog_db_initialized() -> None:
 
         conn.commit()
 
-        # Seed catalog products from initial PRODUCTS list if table is empty
-        cursor.execute("SELECT COUNT(*) FROM catalog_products;")
-        count = cursor.fetchone()[0]
-        now = time.time()
+        # Safe migration: ensure all expected columns exist on catalog_products
+        cursor.execute("SELECT * FROM catalog_products LIMIT 0;")
+        existing_cols = [desc[0].lower() for desc in (cursor.description or [])]
 
-        if count == 0:
-            for p in PRODUCTS:
-                p_status = "ACTIVE" if p.stock > 0 else "OUT_OF_STOCK"
-                cursor.execute(
-                    """
-                    INSERT INTO catalog_products (
-                        id, name, category, merchant_id, price, stock, description, status, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO NOTHING;
-                    """,
-                    (p.id, p.name, p.category, p.merchant_id, p.price, p.stock, p.description, p_status, now, now),
-                )
-            conn.commit()
+        if "merchant_id" not in existing_cols:
+            try:
+                cursor.execute("ALTER TABLE catalog_products ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'MERCH_ELEC';")
+                conn.commit()
+            except Exception:
+                pass
+
+        if "status" not in existing_cols:
+            try:
+                cursor.execute("ALTER TABLE catalog_products ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE';")
+                conn.commit()
+            except Exception:
+                pass
+
+        now_ts = time.time()
+        if "created_at" not in existing_cols:
+            try:
+                cursor.execute(f"ALTER TABLE catalog_products ADD COLUMN created_at REAL NOT NULL DEFAULT {now_ts};")
+                conn.commit()
+            except Exception:
+                pass
+
+        if "updated_at" not in existing_cols:
+            try:
+                cursor.execute(f"ALTER TABLE catalog_products ADD COLUMN updated_at REAL NOT NULL DEFAULT {now_ts};")
+                conn.commit()
+            except Exception:
+                pass
+
+        # Always ensure all catalog products from seed data exist (ON CONFLICT DO NOTHING preserves edited products)
+        for p in PRODUCTS:
+            p_status = "ACTIVE" if p.stock > 0 else "OUT_OF_STOCK"
+            cursor.execute(
+                """
+                INSERT INTO catalog_products (
+                    id, name, category, merchant_id, price, stock, description, status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO NOTHING;
+                """,
+                (p.id, p.name, p.category, p.merchant_id, p.price, p.stock, p.description, p_status, now_ts, now_ts),
+            )
+        conn.commit()
 
         # Seed default affinity graph into product_relationships if empty
         cursor.execute("SELECT COUNT(*) FROM product_relationships;")
@@ -129,7 +157,7 @@ def _ensure_catalog_db_initialized() -> None:
                             source_product_id, target_product_id, relationship_type, created_at
                         ) VALUES (?, ?, 'COMPLEMENTARY', ?);
                         """,
-                        (src, tgt, now),
+                        (src, tgt, now_ts),
                     )
             conn.commit()
 
@@ -139,14 +167,14 @@ def _ensure_catalog_db_initialized() -> None:
 def row_to_product(row: tuple) -> Product:
     """Converts a database tuple row into a Pydantic Product model."""
     return Product(
-        id=row[0],
-        name=row[1],
-        category=row[2],
-        merchant_id=row[3],
+        id=str(row[0]),
+        name=str(row[1]),
+        category=str(row[2]),
+        merchant_id=str(row[3]) if len(row) > 3 and row[3] else "MERCH_ELEC",
         price=float(row[4]),
         stock=int(row[5]),
-        description=row[6],
-        status=row[7] if len(row) > 7 and row[7] else "ACTIVE",
+        description=str(row[6]) if len(row) > 6 and row[6] else "",
+        status=str(row[7]) if len(row) > 7 and row[7] else "ACTIVE",
     )
 
 
