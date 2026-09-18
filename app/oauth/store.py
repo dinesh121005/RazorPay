@@ -296,7 +296,7 @@ class CustomerAuthStore:
                 """
                 INSERT INTO customer_credentials (customer_id, username, email, password_hash, salt)
                 VALUES ('CUST001', 'dinesh', 'dinesh@example.com', ?, ?)
-                ON CONFLICT (customer_id) DO NOTHING
+                ON CONFLICT (customer_id) DO NOTHING;
                 """,
                 (h1, s1),
             )
@@ -309,7 +309,7 @@ class CustomerAuthStore:
                 """
                 INSERT INTO customer_credentials (customer_id, username, email, password_hash, salt)
                 VALUES ('CUST002', 'alex', 'alex@example.com', ?, ?)
-                ON CONFLICT (customer_id) DO NOTHING
+                ON CONFLICT (customer_id) DO NOTHING;
                 """,
                 (h2, s2),
             )
