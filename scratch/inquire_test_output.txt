@@ -1,0 +1,12 @@
+=== inquire keyboard ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"Error executing tool inquire_merchant","type":"text"}],"isError":true}}
+
+
+
+=== inquire webcam ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"Error executing tool inquire_merchant","type":"text"}],"isError":true}}
+
+
+

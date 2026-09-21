@@ -1,0 +1,30 @@
+=== search keyboard ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[],"isError":false,"structuredContent":{"result":[]}}}
+
+
+
+=== search webcam ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[],"isError":false,"structuredContent":{"result":[]}}}
+
+
+
+=== search mouse ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[],"isError":false,"structuredContent":{"result":[]}}}
+
+
+
+=== inquire keyboard ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"Error executing tool inquire_merchant","type":"text"}],"isError":true}}
+
+
+
+=== propose keyboard ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"{\n  \"decision\": \"REJECTED\",\n  \"product_name\": \"KB001\",\n  \"amount\": 0.0,\n  \"reason\": \"System error during purchase processing: syntax error at or near \\\"ON\\\"\\nLINE 5:  ON CONFLICT DO NOTHING\\n         ^\\n\",\n  \"reference_code\": null,\n  \"requires_confirmation\": false,\n  \"confirmation_token\": null\n}","type":"text"}],"isError":false,"structuredContent":{"result":{"decision":"REJECTED","product_name":"KB001","amount":0.0,"reason":"System error during purchase processing: syntax error at or near \"ON\"\nLINE 5:  ON CONFLICT DO NOTHING\n         ^\n","reference_code":null,"requires_confirmation":false,"confirmation_token":null}}}}
+
+
+

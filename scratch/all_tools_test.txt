@@ -1,0 +1,18 @@
+=== get_spending_mandate ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"{\n  \"mandate_found\": true,\n  \"customer_id\": \"CUST001\",\n  \"display_name\": \"Dinesh Kumar\",\n  \"currency\": \"INR\",\n  \"max_limit_per_transaction\": 2000.0,\n  \"allowed_categories\": [\n    \"electronics\",\n    \"home_kitchen\",\n    \"apparel\",\n    \"food\"\n  ],\n  \"allowed_merchants\": [\n    \"MERCH_ELEC\",\n    \"MERCH_FOOD\"\n  ],\n  \"expires_at\": null,\n  \"rule_summary\": \"Pre-authorized spending up to ₹2,000 for electronics, home & kitchen, apparel, and food from verified demo merchants (MERCH_ELEC, MERCH_FOOD).\",\n  \"message\": \"Your current AI spending mandate allows purchases up to ₹2,000.00 for electronics, home_kitchen, apparel, food. You can request to increase or adjust this limit directly in this conversation.\"\n}","type":"text"}],"isError":false,"structuredContent":{"result":{"mandate_found":true,"customer_id":"CUST001","display_name":"Dinesh Kumar","currency":"INR","max_limit_per_transaction":2000.0,"allowed_categories":["electronics","home_kitchen","apparel","food"],"allowed_merchants":["MERCH_ELEC","MERCH_FOOD"],"expires_at":null,"rule_summary":"Pre-authorized spending up to ₹2,000 for electronics, home & kitchen, apparel, and food from verified demo merchants (MERCH_ELEC, MERCH_FOOD).","message":"Your current AI spending mandate allows purchases up to ₹2,000.00 for electronics, home_kitchen, apparel, food. You can request to increase or adjust this limit directly in this conversation."}}}}
+
+
+
+=== check_order_status ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"Error executing tool check_order_status","type":"text"}],"isError":true}}
+
+
+
+=== propose_purchase ===
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"{\n  \"decision\": \"REJECTED\",\n  \"product_name\": \"KB001\",\n  \"amount\": 0.0,\n  \"reason\": \"System error during purchase processing: syntax error at or near \\\"ON\\\"\\nLINE 5:  ON CONFLICT DO NOTHING\\n         ^\\n\",\n  \"reference_code\": null,\n  \"requires_confirmation\": false,\n  \"confirmation_token\": null\n}","type":"text"}],"isError":false,"structuredContent":{"result":{"decision":"REJECTED","product_name":"KB001","amount":0.0,"reason":"System error during purchase processing: syntax error at or near \"ON\"\nLINE 5:  ON CONFLICT DO NOTHING\n         ^\n","reference_code":null,"requires_confirmation":false,"confirmation_token":null}}}}
+
+
+
