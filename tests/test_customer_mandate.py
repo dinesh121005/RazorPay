@@ -117,3 +117,110 @@ def test_remote_mcp_mandate_bound_to_authenticated_customer():
         assert step2["new_limit"] == 4000.0
     finally:
         authenticated_customer_id.reset(token)
+
+
+def test_modify_spending_mandate_add_merchant():
+    """
+    Verify adding a new allowed merchant (e.g. MERCH_NET) to spending mandate:
+    1. Step 1 returns 2-step confirmation challenge mentioning MERCH_NET.
+    2. Step 2 updates DB and reloads to confirm MERCH_NET is stored in allowed_merchants.
+    3. Policy engine approves purchase for MERCH_NET product.
+    """
+    from app.policy.engine import evaluate
+    from app.policy.requests import PurchaseRequest
+
+    # Ensure CUST001 initially does NOT have MERCH_NET
+    mandate_initial = mandate_store.get_mandate("CUST001")
+    assert "MERCH_NET" not in mandate_initial.allowed_merchants
+
+    # Step 1: Request adding MERCH_NET
+    step1 = modify_spending_mandate_handler(
+        add_merchant="MERCH_NET",
+        customer_id="CUST001",
+    )
+    assert step1["requires_confirmation"] is True
+    assert step1["status"] == "AWAITING_HUMAN_CONFIRMATION"
+    assert "MERCH_NET" in step1["human_prompt"]
+    token = step1["confirmation_token"]
+
+    # Step 2: Confirm with token
+    step2 = modify_spending_mandate_handler(
+        add_merchant="MERCH_NET",
+        confirmation_token=token,
+        customer_id="CUST001",
+    )
+    assert step2["success"] is True
+    assert step2["status"] == "APPROVED_AND_UPDATED"
+    assert step2["added_merchant"] == "MERCH_NET"
+
+    # Reload from persistent store and verify MERCH_NET is present
+    mandate_updated = mandate_store.get_mandate("CUST001")
+    assert "MERCH_NET" in mandate_updated.allowed_merchants
+
+    # Verify policy evaluation now approves purchase with MERCH_NET
+    # ensure 'electronics' is in allowed categories or add category as well
+    if "networking" not in mandate_updated.allowed_categories:
+        mandate_store.update_mandate("CUST001", add_category="networking")
+        mandate_updated = mandate_store.get_mandate("CUST001")
+
+    req = PurchaseRequest(
+        customer_id="CUST001",
+        product_id="NET001",
+        merchant="MERCH_NET",
+        category="networking",
+        amount=1299.0,
+    )
+    decision = evaluate(req, mandate_updated)
+    assert decision.status == "APPROVED"
+    assert decision.rule_violated is None
+
+
+def test_modify_spending_mandate_add_category():
+    """Verify adding a new category to mandate works via 2-step confirmation."""
+    step1 = modify_spending_mandate_handler(
+        add_category="gaming",
+        customer_id="CUST001",
+    )
+    assert step1["requires_confirmation"] is True
+    assert "gaming" in step1["human_prompt"]
+    token = step1["confirmation_token"]
+
+    step2 = modify_spending_mandate_handler(
+        add_category="gaming",
+        confirmation_token=token,
+        customer_id="CUST001",
+    )
+    assert step2["success"] is True
+    assert step2["added_category"] == "gaming"
+
+    mandate = mandate_store.get_mandate("CUST001")
+    assert "gaming" in mandate.allowed_categories
+
+
+def test_modify_spending_mandate_combined_update():
+    """Verify updating limit, merchant, and category simultaneously in one 2-step challenge."""
+    step1 = modify_spending_mandate_handler(
+        new_limit=4800.0,
+        add_merchant="MERCH_FASHION",
+        add_category="apparel",
+        customer_id="CUST001",
+    )
+    assert step1["requires_confirmation"] is True
+    token = step1["confirmation_token"]
+
+    step2 = modify_spending_mandate_handler(
+        new_limit=4800.0,
+        add_merchant="MERCH_FASHION",
+        add_category="apparel",
+        confirmation_token=token,
+        customer_id="CUST001",
+    )
+    assert step2["success"] is True
+    assert step2["new_limit"] == 4800.0
+    assert step2["added_merchant"] == "MERCH_FASHION"
+
+    mandate = mandate_store.get_mandate("CUST001")
+    assert mandate.max_transaction_amount == 4800.0
+    assert "MERCH_FASHION" in mandate.allowed_merchants
+    assert "apparel" in mandate.allowed_categories
+

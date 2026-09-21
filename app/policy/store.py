@@ -351,26 +351,57 @@ class MandateStore:
         self.save_mandate(mandate)
         return mandate.model_copy()
 
-    def update_mandate_limit(
+    def update_mandate(
         self,
         customer_id: str,
-        new_limit: float,
+        new_limit: Optional[float] = None,
+        add_merchant: Optional[str] = None,
+        add_category: Optional[str] = None,
     ) -> Mandate:
-        """Updates the transaction limit for an existing customer mandate in SQLite."""
+        """
+        Updates spending limit, adds allowed merchant, and/or adds allowed category for an existing mandate.
+        Persists changes to database and returns a verified Mandate instance reloaded from storage.
+        """
         self._ensure_db_initialized()
         mandate = self.get_mandate(customer_id)
         if mandate is None:
             raise KeyError(f"Mandate for customer '{customer_id}' not found")
 
-        mandate.max_transaction_amount = new_limit
+        if new_limit is not None:
+            mandate.max_transaction_amount = float(new_limit)
+
+        if add_merchant and add_merchant.strip():
+            clean_m = add_merchant.strip()
+            existing_merchs_upper = [m.upper() for m in mandate.allowed_merchants]
+            if clean_m.upper() not in existing_merchs_upper:
+                mandate.allowed_merchants.append(clean_m)
+
+        if add_category and add_category.strip():
+            clean_c = add_category.strip().lower()
+            existing_cats_lower = [c.lower() for c in mandate.allowed_categories]
+            if clean_c not in existing_cats_lower:
+                mandate.allowed_categories.append(clean_c)
+
         cats_str = ", ".join(mandate.allowed_categories)
         merchs_str = ", ".join(mandate.allowed_merchants)
         mandate.prompt_playback = (
-            f"Pre-authorized spending up to ₹{new_limit:,.0f} for {cats_str} "
-            f"from verified demo merchants ({merchs_str})."
+            f"Pre-authorized spending up to ₹{mandate.max_transaction_amount:,.0f} for {cats_str} "
+            f"from verified merchants ({merchs_str})."
         )
         self.save_mandate(mandate)
-        return mandate.model_copy()
+
+        reloaded = self.get_mandate(customer_id)
+        if reloaded is None:
+            raise RuntimeError(f"Mandate for customer '{customer_id}' could not be reloaded after update.")
+        return reloaded
+
+    def update_mandate_limit(
+        self,
+        customer_id: str,
+        new_limit: float,
+    ) -> Mandate:
+        """Updates the transaction limit for an existing customer mandate in database."""
+        return self.update_mandate(customer_id=customer_id, new_limit=new_limit)
 
     def list_mandates(self) -> Dict[str, Mandate]:
         """List all stored mandates from SQLite."""
